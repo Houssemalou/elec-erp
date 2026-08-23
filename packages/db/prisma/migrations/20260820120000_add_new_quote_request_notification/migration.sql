@@ -1,0 +1,1 @@
+ALTER TYPE "NotificationType" ADD VALUE 'NEW_QUOTE_REQUEST';

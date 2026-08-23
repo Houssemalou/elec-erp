@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  /* Palette bleu profond (brand) — cohérente avec l'ERP */
+  --color-brand-50: #eef4fb;
+  --color-brand-100: #d9e6f5;
+  --color-brand-200: #b7cdea;
+  --color-brand-300: #8aaddb;
+  --color-brand-400: #5688c6;
+  --color-brand-500: #3468ab;
+  --color-brand-600: #24528f;
+  --color-brand-700: #1d4274;
+  --color-brand-800: #16345a;
+  --color-brand-900: #0b2545;
+  --color-brand-950: #061733;
+
+  /* Accent électrique (orange/jaune) */
+  --color-accent-300: #ffd166;
+  --color-accent-400: #ffb703;
+  --color-accent-500: #fb8500;
+  --color-accent-600: #e85d04;
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space);
+
+  --shadow-card: 0 1px 2px rgb(6 23 51 / 0.04), 0 1px 3px rgb(6 23 51 / 0.06);
+  --shadow-lifted: 0 8px 24px rgb(6 23 51 / 0.1), 0 3px 8px rgb(6 23 51 / 0.05);
+}
+
+@layer base {
+  body {
+    @apply bg-white text-slate-900 antialiased;
+  }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.5s ease-out both; }

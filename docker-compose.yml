@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: elec
+      POSTGRES_PASSWORD: elec_password
+      POSTGRES_DB: elec
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U elec -d elec"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  erp-admin:
+    build:
+      context: .
+      dockerfile: apps/erp-admin/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://elec:elec_password@db:5432/elec?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-string}
+      AUTH_TRUST_HOST: "true"
+      AUTH_URL: https://haadmin.electro-nova.tn
+      ERP_URL: https://haadmin.electro-nova.tn
+      SHOP_URL: https://electro-nova.tn
+      NEXT_PUBLIC_SHOP_URL: https://electro-nova.tn
+      NEXT_PUBLIC_ERP_URL: https://haadmin.electro-nova.tn
+    depends_on:
+      db:
+        condition: service_healthy
+
+  vitrine:
+    build:
+      context: .
+      dockerfile: apps/vitrine/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://elec:elec_password@db:5432/elec?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-string}
+      AUTH_TRUST_HOST: "true"
+      ERP_URL: https://haadmin.electro-nova.tn
+      SHOP_URL: https://electro-nova.tn
+      NEXT_PUBLIC_SHOP_URL: https://electro-nova.tn
+      NEXT_PUBLIC_ERP_URL: https://haadmin.electro-nova.tn
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - certbot-www:/var/www/certbot
+    depends_on:
+      - erp-admin
+      - vitrine
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  pgdata:
+  certbot-etc:
+  certbot-var:
+  certbot-www:

@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@theme {
+  /* Palette bleu profond (brand) */
+  --color-brand-50: #eef4fb;
+  --color-brand-100: #d9e6f5;
+  --color-brand-200: #b7cdea;
+  --color-brand-300: #8aaddb;
+  --color-brand-400: #5688c6;
+  --color-brand-500: #3468ab;
+  --color-brand-600: #24528f;
+  --color-brand-700: #1d4274;
+  --color-brand-800: #16345a;
+  --color-brand-900: #0b2545;
+  --color-brand-950: #061733;
+
+  /* Accent électrique (orange/jaune) */
+  --color-accent-300: #ffd166;
+  --color-accent-400: #ffb703;
+  --color-accent-500: #fb8500;
+  --color-accent-600: #e85d04;
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space);
+
+  --shadow-card: 0 1px 2px rgb(6 23 51 / 0.04), 0 1px 3px rgb(6 23 51 / 0.06);
+  --shadow-lifted: 0 4px 12px rgb(6 23 51 / 0.08), 0 2px 4px rgb(6 23 51 / 0.04);
+}
+
+@layer base {
+  body {
+    @apply bg-slate-100 text-slate-900 antialiased;
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  select:not(:disabled),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  label,
+  summary,
+  a[href] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  textarea:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}
+
+/* Toast animations */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast-in { animation: toast-in 0.25s ease-out; }
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.5; }
+}
+.animate-pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+/* Impression directe des documents (devis / factures / avoirs) */
+@media print {
+  @page { size: A4; margin: 0; }
+  body { background: white !important; }
+  .print-toolbar { display: none !important; }
+  .print-sheet {
+    width: 210mm !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding-bottom: 32mm !important;
+  }
+  .print-sig {
+    position: fixed !important;
+    right: 0 !important;
+    bottom: 27mm !important;
+    padding: 0 12mm !important;
+    margin: 0 !important;
+  }
+  .print-footer {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    padding: 3mm 12mm !important;
+    background: white !important;
+  }
+}
