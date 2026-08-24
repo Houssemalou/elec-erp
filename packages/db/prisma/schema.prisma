@@ -121,6 +121,11 @@ enum DiscountType {
   AMOUNT
 }
 
+enum InvoiceSource {
+  MANUAL // Créée manuellement via l'ERP
+  POS    // Vente en caisse (point de vente)
+}
+
 enum NotificationType {
   NEW_ORDER
   NEW_QUOTE_REQUEST
@@ -485,6 +490,7 @@ model Invoice {
   customerId    String
   quoteId       String?
   createdById   String
+  source        InvoiceSource @default(MANUAL)
   status        InvoiceStatus @default(DRAFT)
   issueDate     DateTime      @default(now())
   dueDate       DateTime?

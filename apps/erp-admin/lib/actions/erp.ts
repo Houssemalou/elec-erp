@@ -32,6 +32,7 @@ import {
   adjustStock,
   transferStock,
   runInventory,
+  createPosSale,
 } from '@elec/services'
 import { requireRole, ADMIN_ROLE, MANAGER_ROLES, STAFF_ROLES } from '@/lib/session'
 import { hash } from 'bcryptjs'
@@ -966,4 +967,49 @@ export async function updateStoreSettings(fd: FormData): Promise<ActionResult> {
   })
   revalidatePath('/parametres')
   return { success: true }
+}
+
+// ============================================================================
+// Point de Vente (POS) — Vente en caisse
+// ============================================================================
+
+export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
+  const user = await clean(STAFF_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+
+  const customerId = str(fd, 'customerId')
+  const paymentMethod = str(fd, 'paymentMethod') as 'CASH' | 'CARD'
+  if (!customerId) return { success: false, error: 'Client requis' }
+  if (!paymentMethod || !['CASH', 'CARD'].includes(paymentMethod)) {
+    return { success: false, error: 'Mode de paiement invalide' }
+  }
+
+  const rawLines = str(fd, 'lines')
+  let lines: Array<{ productId: string; quantity: number }>
+  try {
+    lines = JSON.parse(rawLines)
+  } catch {
+    return { success: false, error: 'Lignes invalides' }
+  }
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return { success: false, error: 'Ajoutez au moins un produit' }
+  }
+
+  try {
+    const sale = await createPosSale({
+      customerId,
+      createdById: user.id,
+      lines,
+      paymentMethod,
+      notes: str(fd, 'notes') || null,
+    })
+    revalidatePath('/pos')
+    revalidatePath('/factures')
+    revalidatePath('/stock')
+    revalidatePath('/dashboard')
+    revalidatePath('/finance')
+    return { success: true, id: sale.id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
 }

@@ -185,6 +185,18 @@ export const onlineOrderCreateSchema = z.object({
   ).min(1),
 })
 
+export const posSaleSchema = z.object({
+  customerId: z.string().min(1),
+  paymentMethod: z.enum(['CASH', 'CARD']),
+  notes: z.string().optional().nullable(),
+  lines: z.array(
+    z.object({
+      productId: z.string().min(1),
+      quantity: z.coerce.number().positive(),
+    }),
+  ).min(1, 'Ajoutez au moins un produit'),
+})
+
 export const storeSettingsSchema = z.object({
   storeName: z.string().min(1),
   slogan: z.string().optional().nullable(),
@@ -215,5 +227,6 @@ export type CreditNoteInput = z.infer<typeof creditNoteSchema>
 export type PaymentInput = z.infer<typeof paymentSchema>
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>
 export type OnlineOrderCreateInput = z.infer<typeof onlineOrderCreateSchema>
+export type PosSaleInput = z.infer<typeof posSaleSchema>
 export type StoreSettingsInput = z.infer<typeof storeSettingsSchema>
 export type DocumentLineInput = z.infer<typeof documentLineSchema>
