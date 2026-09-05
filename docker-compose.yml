@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://elec:elec_password@db:5432/elec?schema=public
-      AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-string}
+      AUTH_SECRET: ${AUTH_SECRET:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3ODg2MjMwNDgsImV4cCI6MTgyMDE1OTA0OCwianRpIjoiNDYwYmNkNTYtNDc2ZC00NzlkLWIyMDAtODhkYjIyYmJiMzFkIiwiaXNzIjoiYXBpLmV4YW1wbGUuY29tIiwic3ViIjoidXNlcl8yOTY5IiwiYXVkIjoiaHR0cHM6Ly9leGFtcGxlLmNvbSJ9.OzcgJU8CYp89ipMKs8bWAmthBlFM8-_hI23JEMjLHt4}
       AUTH_TRUST_HOST: "true"
       AUTH_URL: https://haadmin.electro-nova.tn
       ERP_URL: https://haadmin.electro-nova.tn
@@ -41,7 +41,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://elec:elec_password@db:5432/elec?schema=public
-      AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-long-random-string}
+      AUTH_SECRET: ${AUTH_SECRET:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3ODg2MjMwNDgsImV4cCI6MTgyMDE1OTA0OCwianRpIjoiNDYwYmNkNTYtNDc2ZC00NzlkLWIyMDAtODhkYjIyYmJiMzFkIiwiaXNzIjoiYXBpLmV4YW1wbGUuY29tIiwic3ViIjoidXNlcl8yOTY5IiwiYXVkIjoiaHR0cHM6Ly9leGFtcGxlLmNvbSJ9.OzcgJU8CYp89ipMKs8bWAmthBlFM8-_hI23JEMjLHt4}
       AUTH_TRUST_HOST: "true"
       ERP_URL: https://haadmin.electro-nova.tn
       SHOP_URL: https://electro-nova.tn
