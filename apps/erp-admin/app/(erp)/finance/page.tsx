@@ -20,18 +20,18 @@ function KpiCard({
   tone?: 'brand' | 'green' | 'red' | 'amber'
 }) {
   const tones = {
-    brand: 'bg-brand-50 text-brand-700',
-    green: 'bg-emerald-50 text-emerald-700',
-    red: 'bg-red-50 text-red-700',
-    amber: 'bg-amber-50 text-amber-700',
+    brand: 'bg-accent-400/10 text-accent-400',
+    green: 'bg-emerald-500/10 text-emerald-400',
+    red: 'bg-red-500/10 text-red-400',
+    amber: 'bg-amber-500/10 text-amber-400',
   }
   return (
     <Card className="p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-2 font-display text-2xl font-bold text-brand-950">{value}</p>
-          {sub ? <p className="mt-1 text-xs text-slate-500">{sub}</p> : null}
+          <p className="text-xs font-medium uppercase tracking-wide text-white/50">{label}</p>
+          <p className="mt-2 font-display text-2xl font-bold text-white">{value}</p>
+          {sub ? <p className="mt-1 text-xs text-white/50">{sub}</p> : null}
         </div>
         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone]}`}>{icon}</div>
       </div>
@@ -112,7 +112,7 @@ export default async function FinancePage() {
           <CardHeader title="TVA par taux" />
           <div className="p-5">
             {Object.entries(vatTotal).length === 0 ? (
-              <p className="text-sm text-slate-400">Aucune donnée</p>
+              <p className="text-sm text-white/40">Aucune donnée</p>
             ) : (
               <ul className="space-y-3 text-sm">
                 {Object.entries(vatTotal)
@@ -120,12 +120,12 @@ export default async function FinancePage() {
                   .map(([rate, tva]) => (
                     <li key={rate} className="flex items-center justify-between">
                       <Badge tone="blue">TVA {rate}%</Badge>
-                      <span className="font-semibold">{money(tva)}</span>
+                      <span className="font-semibold text-white">{money(tva)}</span>
                     </li>
                   ))}
-                <li className="flex items-center justify-between border-t border-slate-100 pt-3">
-                  <span className="text-slate-500">Total TVA</span>
-                  <span className="font-bold text-brand-900">{money(tvaCollected)}</span>
+                <li className="flex items-center justify-between border-t border-[#2A2A2A] pt-3">
+                  <span className="text-white/50">Total TVA</span>
+                  <span className="font-bold text-accent-400">{money(tvaCollected)}</span>
                 </li>
               </ul>
             )}
@@ -146,17 +146,17 @@ export default async function FinancePage() {
           <tbody>
             {topList.map((c, i) => (
               <TR key={c.name}>
-                <TD className="font-medium text-slate-900">
-                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">{i + 1}</span>
+                <TD className="font-medium text-white">
+                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent-400/10 text-xs font-semibold text-accent-400">{i + 1}</span>
                   {c.name}
                 </TD>
-                <TD className="text-right font-semibold">{money(c.total)}</TD>
-                <TD className="text-right text-slate-500">{revenue > 0 ? Math.round((c.total / revenue) * 100) : 0}%</TD>
+                <TD className="text-right font-semibold text-white">{money(c.total)}</TD>
+                <TD className="text-right text-white/50">{revenue > 0 ? Math.round((c.total / revenue) * 100) : 0}%</TD>
               </TR>
             ))}
             {topList.length === 0 ? (
               <TR>
-                <TD colSpan={3} className="py-12 text-center text-slate-400">Aucune vente</TD>
+                <TD colSpan={3} className="py-12 text-center text-white/40">Aucune vente</TD>
               </TR>
             ) : null}
           </tbody>

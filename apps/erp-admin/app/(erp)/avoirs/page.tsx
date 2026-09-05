@@ -51,9 +51,9 @@ export default async function CreditNotesPage({
         }
       />
       <Card>
-        <form className="border-b border-slate-100 p-4">
+        <form className="border-b border-[#2A2A2A] p-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
             <Input name="q" defaultValue={q} placeholder="N° d&apos;avoir, n° de facture…" className="pl-9" />
           </div>
         </form>
@@ -72,14 +72,14 @@ export default async function CreditNotesPage({
           <tbody>
             {notes.map((n) => (
               <TR key={n.id}>
-                <TD className="font-mono text-xs font-medium text-brand-800">{n.number}</TD>
+                <TD className="font-mono text-xs font-medium text-white/70">{n.number}</TD>
                 <TD>{formatDate(n.createdAt)}</TD>
                 <TD>
-                  <Link href={`/factures/${n.invoiceId}`} className="font-mono text-xs text-brand-700 hover:underline">
+                  <Link href={`/factures/${n.invoiceId}`} className="font-mono text-xs text-accent-400 hover:underline">
                     {n.invoice.number}
                   </Link>
                 </TD>
-                <TD className="max-w-xs truncate text-slate-500">{n.reason}</TD>
+                <TD className="max-w-xs truncate text-white/50">{n.reason}</TD>
                 <TD className="text-right font-semibold text-red-700">− {money(n.totalTTC)}</TD>
                 <TD>
                   <Badge tone={n.status === 'VALIDATED' ? 'green' : n.status === 'CANCELLED' ? 'red' : 'slate'}>
@@ -87,7 +87,7 @@ export default async function CreditNotesPage({
                   </Badge>
                 </TD>
                 <TD className="text-right">
-                  <Link href={`/avoirs/${n.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                  <Link href={`/avoirs/${n.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-white/60 hover:bg-white/5">
                     <Eye className="h-3.5 w-3.5" /> Voir
                   </Link>
                 </TD>
@@ -95,7 +95,7 @@ export default async function CreditNotesPage({
             ))}
             {notes.length === 0 ? (
               <TR>
-                <TD colSpan={7} className="py-12 text-center text-slate-400">Aucun avoir</TD>
+                <TD colSpan={7} className="py-12 text-center text-white/40">Aucun avoir</TD>
               </TR>
             ) : null}
           </tbody>

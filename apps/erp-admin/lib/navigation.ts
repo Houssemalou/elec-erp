@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   PiggyBank,
   Monitor,
+  Landmark,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -46,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Ventes',
     items: [
       { href: '/pos', label: 'Caisse (POS)', icon: Monitor, roles: ALL_STAFF },
+      { href: '/ventes-caisse', label: 'Ventes en caisse', icon: Landmark, roles: MANAGER },
       { href: '/commandes', label: 'Commandes en ligne', icon: ShoppingBag, roles: ALL_STAFF },
       { href: '/devis', label: 'Devis', icon: FileText, roles: ALL_STAFF },
       { href: '/factures', label: 'Factures', icon: Receipt, roles: ALL_STAFF },

@@ -10,7 +10,7 @@ import { createOnlineOrder, createQuote, createNotification } from '@elec/servic
 // ============================================================================
 
 export type GuestCheckoutInput = {
-  email: string
+  email?: string
   shippingFullName: string
   shippingAddress?: string
   shippingCity?: string
@@ -29,7 +29,6 @@ export async function createOrderAction(
   input: GuestCheckoutInput,
 ): Promise<{ ok: boolean; orderId?: string; error?: string }> {
   const email = (input.email ?? '').trim().toLowerCase()
-  if (!email) return { ok: false, error: 'L\'e-mail est obligatoire pour la livraison et la facture.' }
   const cin = (input.cin ?? '').trim()
   if (!cin) return { ok: false, error: 'Le numéro de carte d\'identité (CIN) est obligatoire.' }
 
@@ -52,7 +51,7 @@ export async function createOrderAction(
   }
 
   try {
-    const customer = await findOrCreateGuestCustomer(input, email)
+    const customer = await findOrCreateGuestCustomer(input, email || undefined)
 
     const order = await createOnlineOrder({
       customerId: customer.id,
@@ -75,16 +74,24 @@ export async function createOrderAction(
   }
 }
 
-async function findOrCreateGuestCustomer(input: GuestCheckoutInput, email: string) {
+async function findOrCreateGuestCustomer(input: GuestCheckoutInput, email?: string) {
   const parts = (input.shippingFullName ?? '').trim().split(/\s+/)
   const firstName = parts[0] ?? 'Client'
   const lastName = parts.slice(1).join(' ') || null
 
-  const existing = await prisma.customer.findFirst({ where: { email } })
+  const filters: Array<Record<string, string>> = []
+  if (email) filters.push({ email })
+  if (input.shippingPhone) filters.push({ phone: input.shippingPhone })
+  if (input.cin) filters.push({ cin: input.cin })
+
+  const existing = filters.length
+    ? await prisma.customer.findFirst({ where: { OR: filters } })
+    : null
   if (existing) {
     return prisma.customer.update({
       where: { id: existing.id },
       data: {
+        email: email || existing.email,
         phone: input.shippingPhone || existing.phone,
         cin: input.cin || existing.cin,
         address: input.shippingAddress || existing.address,
@@ -98,7 +105,7 @@ async function findOrCreateGuestCustomer(input: GuestCheckoutInput, email: strin
       type: CustomerType.PARTICULIER,
       firstName,
       lastName,
-      email,
+      email: email || null,
       cin: input.cin || null,
       phone: input.shippingPhone || null,
       address: input.shippingAddress || null,
@@ -108,7 +115,7 @@ async function findOrCreateGuestCustomer(input: GuestCheckoutInput, email: strin
 }
 
 export async function getShippingCost(): Promise<number> {
-  return Number(process.env.SHIPPING_COST ?? '0')
+  return Number(process.env.SHIPPING_COST ?? '5')
 }
 
 // ============================================================================

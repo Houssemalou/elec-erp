@@ -64,9 +64,9 @@ export default async function QuotesPage({
         }
       />
       <Card>
-        <form className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4">
+        <form className="flex flex-wrap items-center gap-3 border-b border-[#2A2A2A] p-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
             <Input name="q" defaultValue={q} placeholder="N° de devis, client…" className="pl-9" />
           </div>
           <Select name="status" defaultValue={status} className="w-44">
@@ -77,7 +77,7 @@ export default async function QuotesPage({
                 <option key={k} value={k}>{v}</option>
               ))}
           </Select>
-          <button type="submit" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <button type="submit" className="rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 py-2 text-sm font-medium text-white/70 hover:bg-[#1A1A1A]">
             Filtrer
           </button>
         </form>
@@ -96,16 +96,16 @@ export default async function QuotesPage({
           <tbody>
             {quotes.map((qt) => (
               <TR key={qt.id}>
-                <TD className="font-mono text-xs font-medium text-brand-800">{qt.number}</TD>
+                <TD className="font-mono text-xs font-medium text-white/70">{qt.number}</TD>
                 <TD>{formatDate(qt.createdAt)}</TD>
-                <TD className="font-medium text-slate-900">{customerName(qt)}</TD>
+                <TD className="font-medium text-white">{customerName(qt)}</TD>
                 <TD>{qt.validUntil ? formatDate(qt.validUntil) : '—'}</TD>
                 <TD className="text-right font-semibold">{money(qt.totalTTC)}</TD>
                 <TD>
                   <Badge tone={statusTone[qt.status] ?? 'slate'}>{STATUS_LABELS[qt.status] ?? qt.status}</Badge>
                 </TD>
                 <TD className="text-right">
-                  <Link href={`/devis/${qt.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                  <Link href={`/devis/${qt.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-white/60 hover:bg-white/5">
                     <Eye className="h-3.5 w-3.5" /> Voir
                   </Link>
                 </TD>
@@ -113,7 +113,7 @@ export default async function QuotesPage({
             ))}
             {quotes.length === 0 ? (
               <TR>
-                <TD colSpan={7} className="py-12 text-center text-slate-400">Aucun devis</TD>
+                <TD colSpan={7} className="py-12 text-center text-white/40">Aucun devis</TD>
               </TR>
             ) : null}
           </tbody>

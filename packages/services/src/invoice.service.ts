@@ -266,7 +266,12 @@ export async function registerPayment(input: {
 }
 
 /** Facture générée à partir d'une commande en ligne confirmée. */
-export async function createInvoiceFromOnlineOrder(onlineOrderId: string, createdById: string) {
+export async function createInvoiceFromOnlineOrder(
+  onlineOrderId: string,
+  createdById: string,
+  discountType?: 'PERCENT' | 'AMOUNT' | null,
+  discountValue?: number | null,
+) {
   return db.$transaction(async (tx) => {
     const order = await tx.onlineOrder.findUnique({
       where: { id: onlineOrderId },
@@ -299,8 +304,15 @@ export async function createInvoiceFromOnlineOrder(onlineOrderId: string, create
       })
     }
 
+    // Use provided discount or fall back to order's stored discount
+    const effectiveDiscountType = discountType || (Number(order.discountGlobal) > 0 ? 'AMOUNT' : null)
+    const effectiveDiscountValue = discountType ? (discountValue ?? 0) : Number(order.discountGlobal)
+
     const totals = calculateDocumentTotals({
       lines: rows,
+      globalDiscount: effectiveDiscountType
+        ? { type: effectiveDiscountType, value: effectiveDiscountValue }
+        : null,
       timbreFiscal: Number(order.timbreFiscal),
     })
     const number = await nextSequenceNumber('FAC', currentYear(), tx)

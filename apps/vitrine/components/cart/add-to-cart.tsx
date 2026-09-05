@@ -32,7 +32,7 @@ export function AddToCart({
         window.setTimeout(() => setAdded(false), 1500)
       }}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-xl bg-brand-800 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-60',
+        'inline-flex items-center justify-center gap-2 rounded-xl bg-accent-400 px-4 py-2.5 text-sm font-bold text-[#0B0B0B] transition-colors hover:bg-accent-300 hover:shadow-glow disabled:opacity-60',
         className,
       )}
     >

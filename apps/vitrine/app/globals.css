@@ -1,35 +1,82 @@
 @import "tailwindcss";
 
 @theme {
-  /* Palette bleu profond (brand) — cohérente avec l'ERP */
-  --color-brand-50: #eef4fb;
-  --color-brand-100: #d9e6f5;
-  --color-brand-200: #b7cdea;
-  --color-brand-300: #8aaddb;
-  --color-brand-400: #5688c6;
-  --color-brand-500: #3468ab;
-  --color-brand-600: #24528f;
-  --color-brand-700: #1d4274;
-  --color-brand-800: #16345a;
-  --color-brand-900: #0b2545;
-  --color-brand-950: #061733;
+  --color-brand-50: #1a1a1a;
+  --color-brand-100: #222222;
+  --color-brand-200: #2a2a2a;
+  --color-brand-300: #3a3a3a;
+  --color-brand-400: #555555;
+  --color-brand-500: #777777;
+  --color-brand-600: #999999;
+  --color-brand-700: #b8b8b8;
+  --color-brand-800: #e0e0e0;
+  --color-brand-900: #0B0B0B;
+  --color-brand-950: #050505;
 
-  /* Accent électrique (orange/jaune) */
-  --color-accent-300: #ffd166;
-  --color-accent-400: #ffb703;
-  --color-accent-500: #fb8500;
-  --color-accent-600: #e85d04;
+  --color-accent-300: #FFD54A;
+  --color-accent-400: #FFC400;
+  --color-accent-500: #FFB300;
+  --color-accent-600: #E6A200;
 
   --font-sans: var(--font-inter);
   --font-display: var(--font-space);
 
-  --shadow-card: 0 1px 2px rgb(6 23 51 / 0.04), 0 1px 3px rgb(6 23 51 / 0.06);
-  --shadow-lifted: 0 8px 24px rgb(6 23 51 / 0.1), 0 3px 8px rgb(6 23 51 / 0.05);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.1), 0 1px 3px rgb(0 0 0 / 0.15);
+  --shadow-lifted: 0 4px 12px rgb(0 0 0 / 0.2), 0 2px 4px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 20px rgb(255 196 0 / 0.15);
 }
 
 @layer base {
+  :root {
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F8F9FA;
+    --bg-card: #FFFFFF;
+    --bg-input: #F3F4F6;
+    --border: #E5E7EB;
+    --border-hover: #D1D5DB;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --text-muted: #9CA3AF;
+    --header-bg: #FFFFFF;
+    --header-border: #E5E7EB;
+  }
+
+  .dark {
+    --bg-primary: #0B0B0B;
+    --bg-secondary: #151515;
+    --bg-card: #151515;
+    --bg-input: #151515;
+    --border: #2A2A2A;
+    --border-hover: #3A3A3A;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-muted: rgba(255, 255, 255, 0.4);
+    --header-bg: rgba(11, 11, 11, 0.95);
+    --header-border: #2A2A2A;
+  }
+
   body {
-    @apply bg-white text-slate-900 antialiased;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    @apply antialiased;
+  }
+
+  .dark body {
+    @apply bg-brand-900 text-white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
   }
 }
 
@@ -38,3 +85,9 @@
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up { animation: fade-up 0.5s ease-out both; }
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgb(255 196 0 / 0.2); }
+  50% { box-shadow: 0 0 20px rgb(255 196 0 / 0.4); }
+}
+.animate-glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }

@@ -77,7 +77,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
       <div className="mb-4 flex items-center gap-3">
         <Badge tone={statusTone[quote.status] ?? 'slate'}>{STATUS_LABELS[quote.status] ?? quote.status}</Badge>
         {quote.invoice ? (
-          <Link href={`/factures/${quote.invoice.id}`} className="text-sm font-medium text-brand-700 hover:underline">
+          <Link href={`/factures/${quote.invoice.id}`} className="text-sm font-medium text-accent-400 hover:underline">
             → Facture {quote.invoice.number}
           </Link>
         ) : null}
@@ -89,23 +89,23 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
             <CardHeader title="Client" subtitle={quote.customer.type === 'PROFESSIONNEL' ? 'Professionnel' : 'Particulier'} />
             <div className="grid gap-4 p-5 text-sm sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-400">Nom</p>
-                <p className="font-medium text-slate-900">{customerName}</p>
+                <p className="text-xs text-white/40">Nom</p>
+                <p className="font-medium text-white">{customerName}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Matricule fiscal</p>
-                <p className="font-mono text-slate-700">{quote.customer.matriculeFiscal ?? '—'}</p>
+                <p className="text-xs text-white/40">Matricule fiscal</p>
+                <p className="font-mono text-white/70">{quote.customer.matriculeFiscal ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">CIN</p>
-                <p className="font-mono text-slate-700">{quote.customer.cin ?? '—'}</p>
+                <p className="text-xs text-white/40">CIN</p>
+                <p className="font-mono text-white/70">{quote.customer.cin ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Email</p>
+                <p className="text-xs text-white/40">Email</p>
                 <p>{quote.customer.email ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Téléphone</p>
+                <p className="text-xs text-white/40">Téléphone</p>
                 <p>{quote.customer.phone ?? '—'}</p>
               </div>
             </div>
@@ -128,8 +128,8 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
               <tbody>
                 {quote.items.map((i) => (
                   <TR key={i.id}>
-                    <TD className="font-mono text-xs text-slate-500">{i.sku}</TD>
-                    <TD className="font-medium text-slate-900">{i.designation}</TD>
+                    <TD className="font-mono text-xs text-white/50">{i.sku}</TD>
+                    <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>
                     <TD className="text-right">
@@ -142,7 +142,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
                       )}
                     </TD>
                     <TD className="text-right font-medium">{money(i.lineHT)}</TD>
-                    <TD className="text-right text-slate-500">{Number(i.taxRate.rate)}%</TD>
+                    <TD className="text-right text-white/50">{Number(i.taxRate.rate)}%</TD>
                   </TR>
                 ))}
               </tbody>
@@ -153,14 +153,14 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
             <Card className="p-5">
               {quote.notes ? (
                 <div className="mb-3">
-                  <p className="text-xs text-slate-400">Notes</p>
-                  <p className="text-sm text-slate-700">{quote.notes}</p>
+                  <p className="text-xs text-white/40">Notes</p>
+                  <p className="text-sm text-white/70">{quote.notes}</p>
                 </div>
               ) : null}
               {quote.conditions ? (
                 <div>
-                  <p className="text-xs text-slate-400">Conditions</p>
-                  <p className="text-sm text-slate-700">{quote.conditions}</p>
+                  <p className="text-xs text-white/40">Conditions</p>
+                  <p className="text-sm text-white/70">{quote.conditions}</p>
                 </div>
               ) : null}
             </Card>

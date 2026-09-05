@@ -211,7 +211,7 @@ export function DocumentForm({
       ) : null}
 
       <div className="mt-5 flex items-center justify-between">
-        <h3 className="font-display text-sm font-semibold text-slate-900">Lignes</h3>
+        <h3 className="font-display text-sm font-semibold text-white">Lignes</h3>
         <Button type="button" variant="outline" size="sm" onClick={addLine}>
           <Plus className="h-3.5 w-3.5" /> Ajouter une ligne
         </Button>
@@ -230,7 +230,7 @@ export function DocumentForm({
             <col className="w-[36px]" />
           </colgroup>
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-[#2A2A2A] text-left text-xs font-semibold uppercase tracking-wide text-white/50">
               <th className="px-2 py-2">Produit</th>
               <th className="px-2 py-2">Désignation</th>
               <th className="px-2 py-2 text-right">Qté</th>
@@ -243,7 +243,7 @@ export function DocumentForm({
           </thead>
           <tbody>
             {lines.map((l) => (
-              <tr key={l.key} className="border-b border-slate-100">
+              <tr key={l.key} className="border-b border-[#2A2A2A]">
                 <td className="px-2 py-1.5">
                   <Select
                     value={l.productId}
@@ -292,7 +292,7 @@ export function DocumentForm({
                     <select
                       value={l.discountType}
                       onChange={(e) => updateLine(l.key, { discountType: e.target.value as DocLine['discountType'] })}
-                      className="h-10 w-14 shrink-0 rounded-lg border border-slate-300 bg-white px-1 text-xs text-slate-700 focus:border-brand-500 focus:outline-none"
+                      className="h-10 w-14 shrink-0 rounded-lg border border-[#2A2A2A] bg-[#151515] px-1 text-xs text-white/70 focus:border-accent-400 focus:outline-none"
                     >
                       <option value="">—</option>
                       <option value="PERCENT">%</option>
@@ -322,12 +322,12 @@ export function DocumentForm({
                     ))}
                   </Select>
                 </td>
-                <td className="px-2 py-1.5 text-right font-medium text-slate-900">{money(lineTotal(l))}</td>
+                <td className="px-2 py-1.5 text-right font-medium text-white">{money(lineTotal(l))}</td>
                 <td className="px-2 py-1.5 text-right">
                   <button
                     type="button"
                     onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
-                    className="rounded-lg p-1.5 text-red-500 hover:bg-red-50"
+                    className="rounded-lg p-1.5 text-red-400 hover:bg-red-500/10"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -336,7 +336,7 @@ export function DocumentForm({
             ))}
             {lines.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-2 py-8 text-center text-sm text-slate-400">
+                <td colSpan={8} className="px-2 py-8 text-center text-sm text-white/40">
                   Aucune ligne — cliquez sur « Ajouter une ligne »
                 </td>
               </tr>
@@ -376,20 +376,20 @@ export function DocumentForm({
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[#2A2A2A] pt-4">
         <div className="text-sm">
-          <span className="text-slate-500">Sous-total HT : </span>
-          <span className="font-semibold text-slate-900">{money(subtotalHT)}</span>
+          <span className="text-white/50">Sous-total HT : </span>
+          <span className="font-semibold text-white">{money(subtotalHT)}</span>
           {discountAmount > 0 ? (
             <>
-              <span className="ml-3 text-slate-500">Remise : </span>
-              <span className="font-semibold text-red-600">− {money(discountAmount)}</span>
+              <span className="ml-3 text-white/50">Remise : </span>
+              <span className="font-semibold text-red-400">− {money(discountAmount)}</span>
             </>
           ) : null}
-          <span className="ml-3 text-slate-500">Total HT : </span>
-          <span className="font-semibold text-brand-900">{money(totalHT)}</span>
+          <span className="ml-3 text-white/50">Total HT : </span>
+          <span className="font-semibold text-accent-400">{money(totalHT)}</span>
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" disabled={pending || lines.length === 0}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {pending ? 'Enregistrement…' : submitLabel}

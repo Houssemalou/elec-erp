@@ -32,24 +32,23 @@ export default async function ProductsPage({
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <div className="mb-8">
-        <h1 className="font-display text-3xl font-bold text-brand-950">
+        <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">
           {category?.name ?? 'Tous les produits'}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-[var(--text-muted)]">
           {products.length} produit{products.length > 1 ? 's' : ''} disponible{products.length > 1 ? 's' : ''}
         </p>
       </div>
 
       <div className="flex flex-col gap-8 lg:flex-row">
-        {/* Filtres */}
         <aside className="w-full shrink-0 lg:w-56">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
-            <p className="mb-3 font-display text-sm font-semibold text-brand-950">Catégories</p>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-4 shadow-card">
+            <p className="mb-3 font-display text-sm font-semibold text-[var(--text-primary)]">Catégories</p>
             <ul className="space-y-1">
               <li>
                 <a
                   href="/produits"
-                  className={`block rounded-lg px-3 py-2 text-sm ${!category ? 'bg-brand-50 font-semibold text-brand-800' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`block rounded-lg px-3 py-2 text-sm ${!category ? 'bg-accent-400/10 font-semibold text-accent-400' : 'text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'}`}
                 >
                   Toutes
                 </a>
@@ -58,7 +57,7 @@ export default async function ProductsPage({
                 <li key={c.id}>
                   <a
                     href={`/produits?categorie=${c.slug}`}
-                    className={`block rounded-lg px-3 py-2 text-sm ${category?.id === c.id ? 'bg-brand-50 font-semibold text-brand-800' : 'text-slate-600 hover:bg-slate-50'}`}
+                    className={`block rounded-lg px-3 py-2 text-sm ${category?.id === c.id ? 'bg-accent-400/10 font-semibold text-accent-400' : 'text-[var(--text-secondary)] hover:bg-[var(--border)] hover:text-[var(--text-primary)]'}`}
                   >
                     {c.name}
                   </a>
@@ -71,19 +70,19 @@ export default async function ProductsPage({
         <div className="flex-1">
           <form className="mb-6">
             <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
                 name="q"
                 defaultValue={q}
                 placeholder="Rechercher un produit…"
-                className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-input)] pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent-400 focus:outline-none focus:ring-2 focus:ring-accent-400/20"
               />
               {categorie ? <input type="hidden" name="categorie" value={categorie} /> : null}
             </div>
           </form>
 
           {products.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 py-20 text-center text-slate-500">
+            <div className="rounded-2xl border border-dashed border-[var(--border)] py-20 text-center text-[var(--text-muted)]">
               Aucun produit trouvé
             </div>
           ) : (

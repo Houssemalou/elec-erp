@@ -48,7 +48,7 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
         <Badge tone={note.status === 'VALIDATED' ? 'green' : note.status === 'CANCELLED' ? 'red' : 'slate'}>
           {STATUS_LABELS[note.status] ?? note.status}
         </Badge>
-        <Link href={`/factures/${note.invoiceId}`} className="text-sm font-medium text-brand-700 hover:underline">
+        <Link href={`/factures/${note.invoiceId}`} className="text-sm font-medium text-accent-400 hover:underline">
           ← Facture {note.invoice.number}
         </Link>
       </div>
@@ -59,11 +59,11 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
             <CardHeader title="Motif du retour" />
             <div className="grid gap-4 p-5 text-sm sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-400">Motif</p>
-                <p className="font-medium text-slate-900">{note.reason}</p>
+                <p className="text-xs text-white/40">Motif</p>
+                <p className="font-medium text-white">{note.reason}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Client</p>
+                <p className="text-xs text-white/40">Client</p>
                 <p>
                   {note.customer.companyName ||
                     [note.customer.firstName, note.customer.lastName].filter(Boolean).join(' ') ||
@@ -89,12 +89,12 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
               <tbody>
                 {note.items.map((i) => (
                   <TR key={i.id}>
-                    <TD className="font-mono text-xs text-slate-500">{i.sku}</TD>
-                    <TD className="font-medium text-slate-900">{i.designation}</TD>
+                    <TD className="font-mono text-xs text-white/50">{i.sku}</TD>
+                    <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>
                     <TD className="text-right font-medium">{money(i.lineHT)}</TD>
-                    <TD className="text-right text-slate-500">{Number(i.taxRate.rate)}%</TD>
+                    <TD className="text-right text-white/50">{Number(i.taxRate.rate)}%</TD>
                   </TR>
                 ))}
               </tbody>

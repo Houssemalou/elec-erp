@@ -36,8 +36,8 @@ export default async function QuoteRequestPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="font-display text-3xl font-bold text-brand-950">Demander un devis</h1>
-      <p className="mt-2 text-sm text-slate-500">
+      <h1 className="font-display text-3xl font-bold text-[var(--text-primary)]">Demander un devis</h1>
+      <p className="mt-2 text-sm text-[var(--text-muted)]">
         Sélectionnez les produits souhaités : notre équipe vous prépare un devis gratuit et vous recontacte
         rapidement au {settings?.phone ?? 'téléphone'} ou par e-mail.
       </p>

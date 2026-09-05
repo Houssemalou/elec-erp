@@ -10,12 +10,12 @@ export default async function LoginPage() {
   const logoUrl = settings?.logoUrl ?? null
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-950 p-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0B0B0B] p-4">
       <div
-        className="pointer-events-none absolute inset-0 opacity-20"
+        className="pointer-events-none absolute inset-0 opacity-30"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 20% 20%, rgba(255,183,3,0.25) 0, transparent 40%), radial-gradient(circle at 80% 70%, rgba(52,104,171,0.4) 0, transparent 45%)',
+            'radial-gradient(circle at 20% 20%, rgba(255,196,0,0.2) 0, transparent 40%), radial-gradient(circle at 80% 70%, rgba(255,196,0,0.05) 0, transparent 45%)',
         }}
       />
       <div className="relative w-full max-w-md">
@@ -23,17 +23,17 @@ export default async function LoginPage() {
           {logoUrl ? (
             <img src={logoUrl} alt="ElectroNova HA" className="mx-auto mb-4 h-14 w-14 rounded-2xl object-contain shadow-lifted" />
           ) : (
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-400 to-accent-500 shadow-lifted">
-              <Zap className="h-7 w-7 text-brand-950" />
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-400 shadow-lifted">
+              <Zap className="h-7 w-7 text-accent-400" />
             </div>
           )}
           <h1 className="font-display text-2xl font-bold text-white">ElectroNova HA ERP</h1>
-          <p className="mt-1 text-sm text-brand-200">Gestion du magasin électrique</p>
+          <p className="mt-1 text-sm text-white/50">Gestion du magasin électrique</p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white p-6 shadow-lifted">
-          <h2 className="mb-1 font-display text-lg font-semibold text-brand-950">Bienvenue</h2>
-          <p className="mb-6 text-sm text-slate-500">Connectez-vous pour accéder à votre espace.</p>
+        <div className="rounded-2xl border border-[#2A2A2A] bg-[#151515] p-6 shadow-lifted">
+          <h2 className="mb-1 font-display text-lg font-semibold text-white">Bienvenue</h2>
+          <p className="mb-6 text-sm text-white/50">Connectez-vous pour accéder à votre espace.</p>
           <LoginForm />
         </div>
       </div>

@@ -44,10 +44,10 @@ export function PaymentForm({
         })
       }}
     >
-      {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-      <div className="flex items-center gap-2 text-sm text-slate-600">
-        <Banknote className="h-4 w-4 text-emerald-600" />
-        Reste à payer : <span className="font-semibold text-slate-900">{money(remaining)}</span>
+      {error ? <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p> : null}
+      <div className="flex items-center gap-2 text-sm text-white/60">
+        <Banknote className="h-4 w-4 text-emerald-400" />
+        Reste à payer : <span className="font-semibold text-white">{money(remaining)}</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>

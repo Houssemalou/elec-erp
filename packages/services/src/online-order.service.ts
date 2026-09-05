@@ -13,7 +13,9 @@ type ProductWithTax = Prisma.ProductGetPayload<{ include: { taxRate: true } }>
 //     réel au back-office (NEW_ORDER)
 //   - Confirmation : la réservation est consommée et le stock décrémenté
 //   - Annulation : libération des réservations
-//   - Frais de livraison soumis à la TVA 19% ; timbre fiscal 1 DT inclus
+//   - La TVA est TOUJOURS incluse (les prix affichés en boutique sont TTC) ;
+//     le timbre fiscal de 1 DT s'applique uniquement si une facture est
+//     demandée ; frais de livraison soumis à la TVA 19%.
 // ============================================================================
 
 export interface CreateOnlineOrderInput {
@@ -50,7 +52,7 @@ async function computeOrderTotals(lines: DocumentLineInput[], shippingCost: numb
 
   const totalHT = roundMoney(base.totalHT + shippingHT)
   const timbreFiscal = withInvoice ? 1 : 0
-  const totalTVA = withInvoice ? roundMoney(breakdown.reduce((s, b) => s + b.tva, 0)) : 0
+  const totalTVA = roundMoney(breakdown.reduce((s, b) => s + b.tva, 0))
   const totalTTC = roundMoney(totalHT + totalTVA + timbreFiscal)
 
   return { subtotalHT: base.totalHT, totalHT, totalTVA, totalTTC, timbreFiscal, vatBreakdown: breakdown }
@@ -127,7 +129,7 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
             const price = Number(product.priceHT)
             const rate = Number(product.taxRate.rate)
             const lineHT = roundMoney(price * quantity)
-            const lineTVA = withInvoice ? roundMoney(lineHT * (rate / 100)) : 0
+            const lineTVA = roundMoney(lineHT * (rate / 100))
             return {
               productId: product.id,
               sku: product.sku,
@@ -138,7 +140,7 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
               lineHT: toDecimalString(lineHT),
               taxRateId: product.taxRateId,
               lineTVA: toDecimalString(lineTVA),
-              lineTTC: withInvoice ? toDecimalString(roundMoney(lineHT + lineTVA)) : toDecimalString(lineHT),
+              lineTTC: toDecimalString(roundMoney(lineHT + lineTVA)),
             }
           }),
         },

@@ -67,9 +67,9 @@ export default async function ProductsPage({
       />
 
       <Card>
-        <form className="border-b border-slate-100 p-4">
+        <form className="border-b border-[#2A2A2A] p-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
             <Input name="q" defaultValue={q} placeholder="Rechercher par référence, nom, marque…" className="pl-9" />
           </div>
         </form>
@@ -91,19 +91,19 @@ export default async function ProductsPage({
               const total = p.stockLevels.reduce((s, l) => s + Number(l.quantity), 0)
               return (
                 <TR key={p.id}>
-                  <TD className="font-mono text-xs text-slate-500">{p.sku}</TD>
+                  <TD className="font-mono text-xs text-white/50">{p.sku}</TD>
                   <TD>
                     <div className="flex items-center gap-3">
                       {p.images[0] ? (
                         <img src={p.images[0].url} alt="" className="h-9 w-9 rounded-lg object-cover" />
                       ) : (
-                        <div className="h-9 w-9 rounded-lg bg-brand-50" />
+                        <div className="h-9 w-9 rounded-lg bg-[#1A1A1A]" />
                       )}
                       <div>
-                        <Link href={`/produits/${p.id}/edit`} className="font-medium text-slate-900 hover:text-brand-700">
+                        <Link href={`/produits/${p.id}/edit`} className="font-medium text-white hover:text-accent-400">
                           {p.name}
                         </Link>
-                        {p.brand ? <p className="text-xs text-slate-400">{p.brand}</p> : null}
+                        {p.brand ? <p className="text-xs text-white/40">{p.brand}</p> : null}
                       </div>
                     </div>
                   </TD>
@@ -113,7 +113,7 @@ export default async function ProductsPage({
                   </TD>
                   <TD className="text-right font-medium">{money(p.priceHT)}</TD>
                   <TD className="text-right">
-                    <span className={total <= Number(p.minStockAlert) ? 'font-semibold text-red-600' : 'text-slate-700'}>
+                    <span className={total <= Number(p.minStockAlert) ? 'font-semibold text-red-600' : 'text-white/70'}>
                       {total.toLocaleString('fr-FR')}
                     </span>
                   </TD>
@@ -122,7 +122,7 @@ export default async function ProductsPage({
                   </TD>
                   <TD className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Link href={`/produits/${p.id}/edit`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                      <Link href={`/produits/${p.id}/edit`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-white/60 hover:bg-white/5">
                         <Pencil className="h-3.5 w-3.5" /> Modifier
                       </Link>
                       <ToggleActiveButton id={p.id} isActive={p.isActive} action={toggleProductActive} />
@@ -134,7 +134,7 @@ export default async function ProductsPage({
             })}
             {products.length === 0 ? (
               <TR>
-                <TD colSpan={8} className="py-12 text-center text-slate-400">
+                <TD colSpan={8} className="py-12 text-center text-white/40">
                   Aucun produit trouvé
                 </TD>
               </TR>

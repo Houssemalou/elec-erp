@@ -11,7 +11,7 @@ export default async function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
-      <h1 className="mb-8 font-display text-3xl font-bold text-brand-950">Finaliser ma commande</h1>
+      <h1 className="mb-8 font-display text-3xl font-bold text-[var(--text-primary)]">Finaliser ma commande</h1>
       <CheckoutForm
         storeName={settings?.storeName ?? ''}
         storeAddress={[settings?.address, settings?.city].filter(Boolean).join(', ')}

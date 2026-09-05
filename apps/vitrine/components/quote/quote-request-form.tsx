@@ -30,7 +30,7 @@ export function QuoteRequestForm({
   )
 
   const inputCls =
-    'h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20'
+    'h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-accent-400 focus:outline-none focus:ring-2 focus:ring-accent-400/20'
 
   const addLine = () => {
     const first = products.find((p) => !lines.some((l) => l.productId === p.id)) ?? products[0]
@@ -70,17 +70,17 @@ export function QuoteRequestForm({
 
   if (success) {
     return (
-      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-8 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-600 text-white">
+      <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-8 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
           <CheckCircle2 className="h-8 w-8" />
         </div>
-        <h2 className="mt-4 font-display text-2xl font-bold text-brand-950">Demande envoyée !</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Votre demande de devis <span className="font-mono font-semibold">{success}</span> a bien été enregistrée.
+        <h2 className="mt-4 font-display text-2xl font-bold text-[var(--text-primary)]">Demande envoyée !</h2>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          Votre demande de devis <span className="font-mono font-semibold text-accent-400">{success}</span> a bien été enregistrée.
           Notre équipe vous préparera un devis et vous contactera rapidement.
         </p>
         <div className="mt-6 flex flex-col items-center gap-3">
-          <Link href="/produits" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-600">
+          <Link href="/produits" className="inline-flex items-center gap-2 text-sm font-semibold text-accent-400 hover:text-accent-300">
             <Zap className="h-4 w-4" /> Continuer mes achats
           </Link>
         </div>
@@ -90,12 +90,12 @@ export function QuoteRequestForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-        <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-semibold text-brand-950">
-          <FileText className="h-5 w-5 text-brand-600" /> Produits souhaités
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-card">
+        <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-semibold text-[var(--text-primary)]">
+          <FileText className="h-5 w-5 text-accent-400" /> Produits souhaités
         </h2>
         {lines.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-400">
+          <p className="rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
             Aucun produit sélectionné.
           </p>
         ) : (
@@ -103,9 +103,9 @@ export function QuoteRequestForm({
             {lines.map((line, index) => {
               const product = products.find((p) => p.id === line.productId)
               return (
-                <div key={index} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 p-3">
+                <div key={index} className="flex flex-wrap items-end gap-3 rounded-xl border border-[var(--border)] p-3">
                   <div className="min-w-52 flex-1">
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Produit</label>
+                    <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Produit</label>
                     <select
                       className={inputCls}
                       value={line.productId}
@@ -119,7 +119,7 @@ export function QuoteRequestForm({
                     </select>
                   </div>
                   <div className="w-28">
-                    <label className="mb-1.5 block text-xs font-medium text-slate-600">Quantité</label>
+                    <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Quantité</label>
                     <input
                       type="number"
                       min={1}
@@ -129,18 +129,15 @@ export function QuoteRequestForm({
                       onChange={(e) => updateLine(index, { quantity: Number(e.target.value) })}
                     />
                   </div>
-                  <div className="w-32 pb-1 text-right text-sm text-slate-500">
+                  <div className="w-32 pb-1 text-right text-sm text-[var(--text-muted)]">
                     {product ? (
-                      <>
-                        <p className="font-medium text-slate-900">{money(product.priceHT)}</p>
-                        <p className="text-xs text-slate-400">TVA {product.taxRate}% incluse : {money(product.priceHT * (1 + product.taxRate / 100))}</p>
-                      </>
+                      <p className="font-medium text-[var(--text-primary)]">{money(product.priceHT * (1 + product.taxRate / 100))}</p>
                     ) : null}
                   </div>
                   <button
                     type="button"
                     onClick={() => removeLine(index)}
-                    className="mb-1 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    className="mb-1 flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-red-500/10 hover:text-red-400"
                     aria-label="Retirer la ligne"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -153,29 +150,29 @@ export function QuoteRequestForm({
         <button
           type="button"
           onClick={addLine}
-          className="mt-4 inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+          className="mt-4 inline-flex items-center gap-2 rounded-xl border border-accent-400/30 bg-transparent px-4 py-2.5 text-sm font-semibold text-accent-400 hover:bg-accent-400/10"
         >
           <Plus className="h-4 w-4" /> Ajouter un produit
         </button>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-        <h2 className="mb-4 font-display text-lg font-semibold text-brand-950">Vos coordonnées</h2>
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 shadow-card">
+        <h2 className="mb-4 font-display text-lg font-semibold text-[var(--text-primary)]">Vos coordonnées</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Nom complet</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Nom complet</label>
             <input required className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nom et prénom" />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Téléphone</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Téléphone</label>
             <input required className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+216 …" />
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">E-mail</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">E-mail</label>
             <input required type="email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="vous@exemple.tn" />
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-xs font-medium text-slate-600">Votre besoin (optionnel)</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Votre besoin (optionnel)</label>
             <textarea
               rows={3}
               className={`${inputCls} h-auto py-2.5`}
@@ -188,13 +185,13 @@ export function QuoteRequestForm({
       </div>
 
       {error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
       ) : null}
 
       <button
         type="submit"
         disabled={pending || lines.length === 0}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-500 py-3.5 text-sm font-bold text-brand-950 transition-colors hover:bg-accent-400 disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-400 py-3.5 text-sm font-bold text-[#0B0B0B] transition-colors hover:bg-accent-300 hover:shadow-glow disabled:opacity-60"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {pending ? 'Envoi…' : 'Envoyer ma demande de devis'}

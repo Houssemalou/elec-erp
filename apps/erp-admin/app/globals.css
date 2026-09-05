@@ -1,35 +1,36 @@
 @import "tailwindcss";
 
 @theme {
-  /* Palette bleu profond (brand) */
-  --color-brand-50: #eef4fb;
-  --color-brand-100: #d9e6f5;
-  --color-brand-200: #b7cdea;
-  --color-brand-300: #8aaddb;
-  --color-brand-400: #5688c6;
-  --color-brand-500: #3468ab;
-  --color-brand-600: #24528f;
-  --color-brand-700: #1d4274;
-  --color-brand-800: #16345a;
-  --color-brand-900: #0b2545;
-  --color-brand-950: #061733;
+  /* Palette ELECTRO NOVA HA — Noir profond + jaune électrique */
+  --color-brand-50: #1a1a1a;
+  --color-brand-100: #222222;
+  --color-brand-200: #2a2a2a;
+  --color-brand-300: #3a3a3a;
+  --color-brand-400: #555555;
+  --color-brand-500: #777777;
+  --color-brand-600: #999999;
+  --color-brand-700: #b8b8b8;
+  --color-brand-800: #e0e0e0;
+  --color-brand-900: #0B0B0B;
+  --color-brand-950: #050505;
 
-  /* Accent électrique (orange/jaune) */
-  --color-accent-300: #ffd166;
-  --color-accent-400: #ffb703;
-  --color-accent-500: #fb8500;
-  --color-accent-600: #e85d04;
+  /* Accent jaune électrique / doré */
+  --color-accent-300: #FFD54A;
+  --color-accent-400: #FFC400;
+  --color-accent-500: #FFB300;
+  --color-accent-600: #E6A200;
 
   --font-sans: var(--font-inter);
   --font-display: var(--font-space);
 
-  --shadow-card: 0 1px 2px rgb(6 23 51 / 0.04), 0 1px 3px rgb(6 23 51 / 0.06);
-  --shadow-lifted: 0 4px 12px rgb(6 23 51 / 0.08), 0 2px 4px rgb(6 23 51 / 0.04);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.1), 0 1px 3px rgb(0 0 0 / 0.15);
+  --shadow-lifted: 0 4px 12px rgb(0 0 0 / 0.2), 0 2px 4px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 20px rgb(255 196 0 / 0.15);
 }
 
 @layer base {
   body {
-    @apply bg-slate-100 text-slate-900 antialiased;
+    @apply bg-brand-900 text-white antialiased;
   }
 
   button:not(:disabled),
@@ -49,6 +50,21 @@
   textarea:disabled,
   [aria-disabled='true'] {
     cursor: not-allowed;
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #151515;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #444;
   }
 }
 
@@ -71,33 +87,30 @@
 }
 .animate-pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
 
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgb(255 196 0 / 0.2); }
+  50% { box-shadow: 0 0 20px rgb(255 196 0 / 0.4); }
+}
+.animate-glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }
+
 /* Impression directe des documents (devis / factures / avoirs) */
 @media print {
   @page { size: A4; margin: 0; }
-  body { background: white !important; }
+  body { background: white !important; color: #000 !important; }
   .print-toolbar { display: none !important; }
   .print-sheet {
     width: 210mm !important;
-    min-height: auto !important;
+    /* Sous la zone imprimable A4 pour garantir UNE seule page ;
+       overflow:hidden coupe tout débordement */
+    height: 275mm !important;
+    max-height: 275mm !important;
+    overflow: hidden !important;
     margin: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    padding-bottom: 32mm !important;
+    padding: 10mm 12mm 0 !important;
   }
-  .print-sig {
-    position: fixed !important;
-    right: 0 !important;
-    bottom: 27mm !important;
-    padding: 0 12mm !important;
-    margin: 0 !important;
-  }
-  .print-footer {
-    position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    margin: 0 !important;
-    padding: 3mm 12mm !important;
-    background: white !important;
-  }
+  /* Le .print-footer reste dans le flux (flex-shrink-0) : le flexbox le
+     place en bas de la feuille. AUCUN position:fixed (il se répèterait
+     sur chaque page imprimée). */
 }

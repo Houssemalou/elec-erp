@@ -28,7 +28,7 @@ export function ToggleActiveButton({
         })
       }
       className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors ${
-        isActive ? 'text-slate-500 hover:bg-amber-50 hover:text-amber-700' : 'text-emerald-600 hover:bg-emerald-50'
+        isActive ? 'text-white/50 hover:bg-amber-500/10 hover:text-amber-400' : 'text-emerald-400 hover:bg-emerald-500/10'
       }`}
     >
       {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Power className="h-3.5 w-3.5" />}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, XCircle } from 'lucide-react'
+import { Loader2, XCircle, FileText } from 'lucide-react'
 import { Button, Input, Select, Label } from '@/components/ui'
 import { startActionLoader, stopActionLoader } from '@/lib/action-events'
 
@@ -15,6 +15,92 @@ const ORDER_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'CANCELLED', label: 'Annulée' },
   { value: 'REFUNDED', label: 'Remboursée' },
 ]
+
+export function GenerateInvoiceButton({
+  id,
+  action,
+}: {
+  id: string
+  action: (id: string, fd?: FormData) => Promise<{ success: boolean; error?: string; id?: string }>
+}) {
+  const [open, setOpen] = useState(false)
+  const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE')
+  const [discountValue, setDiscountValue] = useState('')
+  const [error, setError] = useState<string>()
+  const [pending, startTransition] = useTransition()
+  const router = useRouter()
+
+  const run = () => {
+    setError(undefined)
+    startActionLoader()
+    startTransition(async () => {
+      try {
+        const fd = new FormData()
+        if (discountType !== 'NONE') {
+          fd.set('discountType', discountType)
+          fd.set('discountValue', discountValue || '0')
+        }
+        const res = await action(id, fd)
+        if (!res.success) {
+          setError(res.error ?? 'Erreur')
+          return
+        }
+        setOpen(false)
+        router.refresh()
+      } finally {
+        stopActionLoader()
+      }
+    })
+  }
+
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        <FileText className="h-4 w-4" /> Générer la facture
+      </Button>
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#2A2A2A] bg-[#151515] p-6 shadow-xl">
+            <h3 className="font-display text-base font-semibold text-white">Générer la facture</h3>
+            <p className="mt-1 text-xs text-white/50">Vous pouvez appliquer une remise globale avant de générer la facture.</p>
+            {error ? <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p> : null}
+            <div className="mt-4 space-y-3">
+              <div>
+                <Label>Remise globale</Label>
+                <div className="flex items-center gap-2">
+                  <Select value={discountType} onChange={(e) => { setDiscountType(e.target.value as 'NONE' | 'PERCENT' | 'AMOUNT'); setDiscountValue(''); }}>
+                    <option value="NONE">Aucune</option>
+                    <option value="PERCENT">Pourcentage (%)</option>
+                    <option value="AMOUNT">Montant (DT)</option>
+                  </Select>
+                  {discountType !== 'NONE' && (
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      placeholder={discountType === 'PERCENT' ? 'Ex: 10' : 'Ex: 50'}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>
+                Retour
+              </Button>
+              <Button type="button" variant="secondary" onClick={run} disabled={pending}>
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {pending ? 'Génération…' : 'Générer la facture'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  )
+}
 
 export function CancelOrderButton({
   id,
@@ -53,11 +139,11 @@ export function CancelOrderButton({
         <XCircle className="h-4 w-4" /> Annuler la commande
       </Button>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
-            <h3 className="font-display text-base font-semibold text-slate-900">Annuler la commande</h3>
-            <p className="mt-1 text-xs text-slate-500">La réservation de stock sera libérée.</p>
-            {error ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#2A2A2A] bg-[#151515] p-6 shadow-xl">
+            <h3 className="font-display text-base font-semibold text-white">Annuler la commande</h3>
+            <p className="mt-1 text-xs text-white/50">La réservation de stock sera libérée.</p>
+            {error ? <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p> : null}
             <div className="mt-4">
               <Label>Motif (optionnel)</Label>
               <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motif de l'annulation…" />
@@ -124,7 +210,7 @@ export function StatusUpdater({
           </Button>
         </div>
       </div>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
   )
 }

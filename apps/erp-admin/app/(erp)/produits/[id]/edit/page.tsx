@@ -29,7 +29,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
               weightKg: product.weightKg === null ? null : Number(product.weightKg),
               minStockAlert: Number(product.minStockAlert),
             }}
-            categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+            categories={categories.map((c) => ({ id: c.id, name: c.name, markupPercent: c.markupPercent ? Number(c.markupPercent) : null }))}
             taxRates={taxRates.map((t) => ({ id: t.id, label: t.label, rate: Number(t.rate) }))}
           />
         </EntityForm>

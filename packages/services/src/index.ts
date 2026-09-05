@@ -11,5 +11,6 @@ export * from './pdf.service'
 export * from './mail.service'
 export * from './dashboard.service'
 export * from './pos.service'
+export * from './delivery-note.service'
 
 export { prisma, db } from '@elec/db'

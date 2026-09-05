@@ -111,15 +111,15 @@ export async function incrementStock(input: StockOpInput) {
 // Réservation (commande en ligne non confirmée) et libération
 // ---------------------------------------------------------------------------
 
+/**
+ * Réservation d'une quantité pour une commande en ligne.
+ * Toujours acceptée, même si le stock disponible est insuffisant (backorder) :
+ * les commandes en ligne passent même hors stock. Le disponible peut donc
+ * devenir négatif, signalant une commande à honorer dès réapprovisionnement.
+ */
 export async function reserveStockCore(client: DbClient, input: StockOpInput) {
   if (input.quantity <= 0) throw new StockError('La quantité doit être positive')
   const level = await getOrCreateStockLevel(client, input.productId, input.warehouseId)
-  const available = Number(level.quantity) - Number(level.reservedQuantity)
-  if (available < input.quantity) {
-    throw new StockError(
-      `Stock disponible insuffisant pour ${input.productId} (${available.toFixed(3)})`,
-    )
-  }
   await client.stockLevel.update({
     where: { id: level.id },
     data: { reservedQuantity: { increment: input.quantity } },

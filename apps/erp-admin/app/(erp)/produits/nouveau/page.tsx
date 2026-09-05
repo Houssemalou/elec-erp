@@ -18,7 +18,7 @@ export default async function NewProductPage() {
       <Card className="p-6">
         <EntityForm action={createProduct} submitLabel="Créer le produit" cancelHref="/produits">
           <ProductFormFields
-            categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+            categories={categories.map((c) => ({ id: c.id, name: c.name, markupPercent: c.markupPercent ? Number(c.markupPercent) : null }))}
             taxRates={taxRates.map((t) => ({ id: t.id, label: t.label, rate: Number(t.rate) }))}
           />
         </EntityForm>

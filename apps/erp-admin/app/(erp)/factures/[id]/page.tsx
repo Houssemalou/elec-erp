@@ -73,12 +73,12 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Badge tone={statusTone[invoice.status] ?? 'slate'}>{STATUS_LABELS[invoice.status] ?? invoice.status}</Badge>
         {invoice.quote ? (
-          <Link href={`/devis/${invoice.quote.id}`} className="text-sm font-medium text-brand-700 hover:underline">
+          <Link href={`/devis/${invoice.quote.id}`} className="text-sm font-medium text-accent-400 hover:underline">
             ← Devis {invoice.quote.number}
           </Link>
         ) : null}
         {invoice.creditNotes.length > 0 ? (
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-white/50">
             {invoice.creditNotes.length} avoir(s) émis
           </span>
         ) : null}
@@ -90,23 +90,23 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             <CardHeader title="Client" subtitle={invoice.customer.type === 'PROFESSIONNEL' ? 'Professionnel' : 'Particulier'} />
             <div className="grid gap-4 p-5 text-sm sm:grid-cols-2">
               <div>
-                <p className="text-xs text-slate-400">Nom</p>
-                <p className="font-medium text-slate-900">{customerName}</p>
+                <p className="text-xs text-white/40">Nom</p>
+                <p className="font-medium text-white">{customerName}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Matricule fiscal</p>
-                <p className="font-mono text-slate-700">{invoice.customer.matriculeFiscal ?? '—'}</p>
+                <p className="text-xs text-white/40">Matricule fiscal</p>
+                <p className="font-mono text-white/70">{invoice.customer.matriculeFiscal ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">CIN</p>
-                <p className="font-mono text-slate-700">{invoice.customer.cin ?? '—'}</p>
+                <p className="text-xs text-white/40">CIN</p>
+                <p className="font-mono text-white/70">{invoice.customer.cin ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Émise le</p>
+                <p className="text-xs text-white/40">Émise le</p>
                 <p>{formatDate(invoice.issueDate)}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-400">Échéance</p>
+                <p className="text-xs text-white/40">Échéance</p>
                 <p>{invoice.dueDate ? formatDate(invoice.dueDate) : '—'}</p>
               </div>
             </div>
@@ -129,8 +129,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               <tbody>
                 {invoice.items.map((i) => (
                   <TR key={i.id}>
-                    <TD className="font-mono text-xs text-slate-500">{i.sku}</TD>
-                    <TD className="font-medium text-slate-900">{i.designation}</TD>
+                    <TD className="font-mono text-xs text-white/50">{i.sku}</TD>
+                    <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>
                     <TD className="text-right">
@@ -143,7 +143,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                       )}
                     </TD>
                     <TD className="text-right font-medium">{money(i.lineHT)}</TD>
-                    <TD className="text-right text-slate-500">{Number(i.taxRate.rate)}%</TD>
+                    <TD className="text-right text-white/50">{Number(i.taxRate.rate)}%</TD>
                   </TR>
                 ))}
               </tbody>
@@ -168,9 +168,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                     <TR key={p.id}>
                       <TD>{formatDate(p.receivedAt)}</TD>
                       <TD className="capitalize">{p.method.replaceAll('_', ' ').toLowerCase()}</TD>
-                      <TD className="font-mono text-xs text-slate-500">{p.reference ?? '—'}</TD>
+                      <TD className="font-mono text-xs text-white/50">{p.reference ?? '—'}</TD>
                       <TD>{p.createdBy.name}</TD>
-                      <TD className="text-right font-semibold text-emerald-700">{money(p.amount)}</TD>
+                      <TD className="text-right font-semibold text-emerald-400">{money(p.amount)}</TD>
                     </TR>
                   ))}
                 </tbody>
@@ -203,7 +203,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 <ActionButton action={cancelInvoiceAction.bind(null, id)} label="Annuler la facture" variant="danger" confirm="Annuler cette facture ?" />
               ) : null}
               {['VALIDATED', 'PAID', 'PARTIALLY_PAID'].includes(invoice.status) && invoice.status !== 'CREDITED' ? (
-                <Link href={`/avoirs/nouveau?invoice=${invoice.id}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                <Link href={`/avoirs/nouveau?invoice=${invoice.id}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 text-sm font-medium text-white/70 hover:bg-[#1A1A1A]">
                   <FileText className="h-4 w-4" /> Émettre un avoir
                 </Link>
               ) : null}

@@ -4,6 +4,7 @@ import './globals.css'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
 import { CartProvider } from '@/components/cart/cart-provider'
+import { ThemeProvider } from '@/components/theme-provider'
 import { ProgressBar } from '@/components/progress-bar'
 import { getStoreSettings } from '@elec/services'
 
@@ -17,6 +18,9 @@ export const metadata: Metadata = {
   },
   description:
     'Vente de matériel électrique : câbles, disjoncteurs, éclairage, tableaux et appareillage. Livraison en Chamal El Gharbi et Grande Tunis.',
+  icons: {
+    icon: '/logo-url.jpg',
+  },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,14 +28,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const storeName = settings?.storeName || 'ElectroNova HA'
 
   return (
-    <html lang="fr">
+    <html lang="fr" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} ${space.variable} font-sans`}>
-        <ProgressBar />
-        <CartProvider>
-          <Navbar storeName={storeName} logoUrl={settings?.logoUrl ?? null} />
-          {children}
-          <Footer settings={settings} />
-        </CartProvider>
+        <ThemeProvider>
+          <ProgressBar />
+          <CartProvider>
+            <Navbar storeName={storeName} logoUrl={settings?.logoUrl ?? null} />
+            {children}
+            <Footer settings={settings} />
+          </CartProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

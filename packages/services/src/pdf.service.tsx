@@ -11,8 +11,11 @@ import { getStoreSettings } from './helpers'
 //     conditions de règlement)
 // ============================================================================
 
-const fmt = (n: number | string | Prisma.Decimal) =>
-  Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).replace(/\u00A0/g, ' ')
+const fmt = (n: number | string | Prisma.Decimal) => {
+  const fixed = Number(n).toFixed(3)
+  const stripped = fixed.replace(/\.?0+$/, '')
+  return stripped.replace('.', ',')
+}
 
 const styles = StyleSheet.create({
   page: {
@@ -21,7 +24,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
     fontSize: 8.5,
     paddingTop: 36,
-    paddingBottom: 150,
+    paddingBottom: 20,
     paddingHorizontal: 40,
   },
   header: {
@@ -40,15 +43,21 @@ const styles = StyleSheet.create({
   block: { flex: 1 },
   blockLabel: { fontSize: 7, fontWeight: 700, marginBottom: 3, textTransform: 'uppercase' },
   table: { borderTopWidth: 1, borderTopColor: '#000000' },
-  row: {
+  rowHeader: {
     flexDirection: 'row',
-    borderBottomWidth: 0.5,
+    borderBottomWidth: 1,
     borderBottomColor: '#000000',
+    fontWeight: 700,
     paddingVertical: 4,
     alignItems: 'center',
   },
-  rowHeader: { borderBottomWidth: 1, borderBottomColor: '#000000', fontWeight: 700 },
-  cell: { paddingHorizontal: 3 },
+  row: {
+    flexDirection: 'row',
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  cell: { paddingHorizontal: 3, borderRightWidth: 0.5, borderRightColor: '#cccccc' },
+  cellLast: { paddingHorizontal: 3 },
   num: { textAlign: 'right' },
   colSku: { width: '9%' },
   colDesignation: { width: '30%' },
@@ -59,15 +68,23 @@ const styles = StyleSheet.create({
   colTva: { width: '8%' },
   colMtTva: { width: '9%' },
   colTtc: { width: '8%' },
-  recap: { marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end' },
-  recapBox: { width: '38%' },
+  bottomRow: {
+    position: 'absolute',
+    left: 40,
+    right: 40,
+    bottom: 60,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  signatureBlock: { width: '38%' },
+  recapBlock: { width: '42%' },
   recapRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
   recapRowTotal: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, marginTop: 4, borderTopWidth: 1, borderTopColor: '#000000', fontWeight: 700 },
-  signature: { position: 'absolute', right: 40, bottom: 74, width: '38%', alignItems: 'flex-end' },
   signatureSpace: { height: 54, marginTop: 4 },
   footer: {
     position: 'absolute',
-    bottom: 28,
+    bottom: 20,
     left: 40,
     right: 40,
     borderTopWidth: 1,
@@ -120,6 +137,7 @@ export interface PdfDocumentData {
 
 function PdfDocumentView({ data }: { data: PdfDocumentData }) {
   const dateStr = data.date.toLocaleDateString('fr-FR')
+  const emptyRows = Math.max(0, 12 - data.lines.length)
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -131,7 +149,6 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
             {data.store.slogan && data.store.slogan !== data.store.activity ? <Text style={styles.storeMeta}>{data.store.slogan}</Text> : null}
             {data.store.address ? <Text style={styles.storeMeta}>Adresse : {data.store.address}{data.store.city ? `, ${data.store.city}` : ''}</Text> : null}
             {data.store.phone ? <Text style={styles.storeMeta}>Tél : {data.store.phone}</Text> : null}
-            {data.store.email ? <Text style={styles.storeMeta}>E-mail : {data.store.email}</Text> : null}
             {data.store.matriculeFiscal ? <Text style={styles.storeMeta}>Matricule fiscal : {data.store.matriculeFiscal}</Text> : null}
           </View>
           <View>
@@ -155,9 +172,9 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
           </View>
         </View>
 
-        {/* Tableau des lignes */}
+        {/* Tableau des lignes — vertical lines extend through all rows */}
         <View style={styles.table}>
-          <View style={[styles.row, styles.rowHeader]}>
+          <View style={styles.rowHeader}>
             <Text style={[styles.cell, styles.colSku]}>Référence</Text>
             <Text style={[styles.cell, styles.colDesignation]}>Désignation</Text>
             <Text style={[styles.cell, styles.colQty, styles.num]}>Qté</Text>
@@ -166,7 +183,7 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
             <Text style={[styles.cell, styles.colPrixHT, styles.num]}>Prix HT</Text>
             <Text style={[styles.cell, styles.colTva, styles.num]}>TVA %</Text>
             <Text style={[styles.cell, styles.colMtTva, styles.num]}>Mt TVA</Text>
-            <Text style={[styles.cell, styles.colTtc, styles.num]}>TTC</Text>
+            <Text style={[styles.cellLast, styles.colTtc, styles.num]}>TTC</Text>
           </View>
           {data.lines.map((l, i) => (
             <View key={i} style={styles.row}>
@@ -176,16 +193,37 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text style={[styles.cell, styles.colPu, styles.num]}>{fmt(l.unitPriceHT)}</Text>
               <Text style={[styles.cell, styles.colRemise, styles.num]}>{l.discountLabel || '-'}</Text>
               <Text style={[styles.cell, styles.colPrixHT, styles.num]}>{fmt(l.lineHT)}</Text>
-              <Text style={[styles.cell, styles.colTva, styles.num]}>{fmt(l.taxRate)}%</Text>
+              <Text style={[styles.cell, styles.colTva, styles.num]}>{fmt(l.taxRate)}</Text>
               <Text style={[styles.cell, styles.colMtTva, styles.num]}>{fmt(l.lineTVA)}</Text>
-              <Text style={[styles.cell, styles.colTtc, styles.num]}>{fmt(l.lineTTC)}</Text>
+              <Text style={[styles.cellLast, styles.colTtc, styles.num]}>{fmt(l.lineTTC)}</Text>
+            </View>
+          ))}
+          {Array.from({ length: emptyRows }).map((_, i) => (
+            <View key={`empty-${i}`} style={styles.row}>
+              <Text style={[styles.cell, styles.colSku]}>&#8203;</Text>
+              <Text style={[styles.cell, styles.colDesignation]}>&#8203;</Text>
+              <Text style={[styles.cell, styles.colQty, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, styles.colPu, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, styles.colRemise, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, styles.colPrixHT, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, styles.colTva, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, styles.colMtTva, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cellLast, styles.colTtc, styles.num]}>&#8203;</Text>
             </View>
           ))}
         </View>
 
-        {/* Récapitulatif */}
-        <View style={styles.recap}>
-          <View style={styles.recapBox}>
+        {/* Bottom row: Signature (left) + Totals (right) — absolutely positioned */}
+        <View style={styles.bottomRow}>
+          {/* Signature — bottom left */}
+          <View style={styles.signatureBlock}>
+            <Text style={styles.blockLabel}>Cachet &amp; signature</Text>
+            <Text style={{ fontSize: 8, fontWeight: 700, marginTop: 2 }}>{data.store.name}</Text>
+            <View style={styles.signatureSpace} />
+          </View>
+
+          {/* Totals — bottom right */}
+          <View style={styles.recapBlock}>
             <View style={styles.recapRow}>
               <Text>Total HT</Text>
               <Text>{fmt(data.totalHTBeforeGlobal)} DT</Text>
@@ -217,13 +255,6 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text>{fmt(data.totalTTC)} DT</Text>
             </View>
           </View>
-        </View>
-
-        {/* Cachet & signature (magasin) — en bas à droite, juste au-dessus du pied de page */}
-        <View style={styles.signature}>
-          <Text style={styles.blockLabel}>Cachet &amp; signature</Text>
-          <Text style={{ fontSize: 8, fontWeight: 700, marginTop: 2 }}>{data.store.name}</Text>
-          <View style={styles.signatureSpace} />
         </View>
 
         {/* Pied de page : mentions légales obligatoires */}

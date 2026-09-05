@@ -41,6 +41,10 @@ export interface ActionResult {
   success: boolean
   error?: string
   id?: string
+  deliveryNoteId?: string
+  deliveryNoteNumber?: string
+  invoiceId?: string
+  invoiceNumber?: string
 }
 
 function str(fd: FormData, key: string): string {
@@ -141,6 +145,7 @@ export async function createCategory(fd: FormData): Promise<ActionResult> {
       description: str(fd, 'description') || null,
       parentId: str(fd, 'parentId') || null,
       taxRateId: str(fd, 'taxRateId') || null,
+      markupPercent: num(fd, 'markupPercent') || null,
       active: check(fd, 'active'),
       sortOrder: Math.round(num(fd, 'sortOrder')),
     },
@@ -167,6 +172,7 @@ export async function updateCategory(id: string, fd: FormData): Promise<ActionRe
       description: str(fd, 'description') || null,
       parentId: str(fd, 'parentId') || null,
       taxRateId: str(fd, 'taxRateId') || null,
+      markupPercent: num(fd, 'markupPercent') || null,
       active: check(fd, 'active'),
       sortOrder: Math.round(num(fd, 'sortOrder')),
     },
@@ -861,11 +867,22 @@ export async function markOrderPaidAction(id: string, method: string): Promise<A
   return { success: true }
 }
 
-export async function createInvoiceFromOrderAction(id: string): Promise<ActionResult> {
+export async function createInvoiceFromOrderAction(id: string, fd?: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
+
+  let discountType: 'PERCENT' | 'AMOUNT' | null = null
+  let discountValue = 0
+  if (fd) {
+    const dt = str(fd, 'discountType')
+    if (dt === 'PERCENT' || dt === 'AMOUNT') {
+      discountType = dt
+      discountValue = parseFloat(str(fd, 'discountValue') || '0')
+    }
+  }
+
   try {
-    const inv = await createInvoiceFromOnlineOrder(id, user.id)
+    const inv = await createInvoiceFromOnlineOrder(id, user.id, discountType, discountValue)
     revalidatePath('/commandes')
     revalidatePath('/factures')
     revalidatePath(`/commandes/${id}`)
@@ -977,9 +994,9 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
 
-  const customerId = str(fd, 'customerId')
+  const customerId = str(fd, 'customerId') || null
   const paymentMethod = str(fd, 'paymentMethod') as 'CASH' | 'CARD'
-  if (!customerId) return { success: false, error: 'Client requis' }
+  const generateInvoice = fd.get('generateInvoice') === 'true'
   if (!paymentMethod || !['CASH', 'CARD'].includes(paymentMethod)) {
     return { success: false, error: 'Mode de paiement invalide' }
   }
@@ -995,20 +1012,51 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
     return { success: false, error: 'Ajoutez au moins un produit' }
   }
 
+  // Manual client info for invoice
+  let manualClient: { firstName: string; lastName?: string; companyName?: string; address?: string; matriculeFiscal?: string; cin?: string } | null = null
+  if (generateInvoice && !customerId) {
+    const firstName = str(fd, 'manualFirstName')
+    const lastName = str(fd, 'manualLastName')
+    const companyName = str(fd, 'manualCompany')
+    const address = str(fd, 'manualAddress')
+    const matriculeFiscal = str(fd, 'manualMatricule')
+    const cin = str(fd, 'manualCin')
+    if (!firstName) {
+      return { success: false, error: 'Le nom du client est requis pour générer une facture' }
+    }
+    manualClient = { firstName, lastName, companyName, address, matriculeFiscal, cin }
+  }
+
+  // Discount
+  const discountType = str(fd, 'discountType') as 'PERCENT' | 'AMOUNT' | ''
+  const discountValue = parseFloat(str(fd, 'discountValue') || '0')
+
   try {
     const sale = await createPosSale({
       customerId,
       createdById: user.id,
       lines,
       paymentMethod,
+      generateInvoice,
+      manualClient,
+      globalDiscountType: discountType || null,
+      globalDiscountValue: discountValue || null,
       notes: str(fd, 'notes') || null,
     })
     revalidatePath('/pos')
+    revalidatePath('/ventes-caisse')
     revalidatePath('/factures')
     revalidatePath('/stock')
     revalidatePath('/dashboard')
     revalidatePath('/finance')
-    return { success: true, id: sale.id }
+    return {
+      success: true,
+      id: sale.deliveryNoteId,
+      deliveryNoteId: sale.deliveryNoteId,
+      deliveryNoteNumber: sale.deliveryNoteNumber,
+      invoiceId: sale.invoiceId,
+      invoiceNumber: sale.invoiceNumber,
+    }
   } catch (e) {
     return { success: false, error: (e as Error).message }
   }

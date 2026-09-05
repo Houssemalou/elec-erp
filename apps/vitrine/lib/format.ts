@@ -1,6 +1,8 @@
 export function money(value: number | string | { toString(): string }): string {
   const n = typeof value === 'object' ? Number(value.toString()) : Number(value)
-  return `${n.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).replace(/\u00A0/g, ' ')} DT`
+  const fixed = n.toFixed(3)
+  const stripped = fixed.replace(/\.?0+$/, '')
+  return `${stripped.replace('.', ',')} DT`
 }
 
 export function formatDate(date: Date | string | null | undefined): string {

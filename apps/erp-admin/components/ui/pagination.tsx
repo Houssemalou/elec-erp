@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export const PAGE_SIZE = 20
+export const PAGE_SIZE = 14
 
 function buildUrl(params: Record<string, string | undefined>, page: number) {
   const sp = new URLSearchParams()
@@ -42,8 +42,8 @@ export function Pagination({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4">
-      <p className="text-xs text-slate-500">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#2A2A2A] px-5 py-4">
+      <p className="text-xs text-white/50">
         {total !== undefined ? `${total} élément${total > 1 ? 's' : ''} — ` : ''}Page {page} sur {totalPages}
       </p>
       <div className="flex items-center gap-1">
@@ -52,7 +52,7 @@ export function Pagination({
           aria-disabled={page <= 1}
           tabIndex={page <= 1 ? -1 : undefined}
           className={cn(
-            'inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50',
+            'inline-flex h-8 items-center gap-1 rounded-lg border border-[#2A2A2A] bg-[#151515] px-3 text-xs font-medium text-white/60 hover:bg-white/5 hover:text-white',
             page <= 1 && 'pointer-events-none opacity-40',
           )}
         >
@@ -60,7 +60,7 @@ export function Pagination({
         </Link>
         {pages.map((p, i) =>
           p === '…' ? (
-            <span key={`e-${i}`} className="px-1 text-xs text-slate-400">
+            <span key={`e-${i}`} className="px-1 text-xs text-white/40">
               …
             </span>
           ) : (
@@ -70,8 +70,8 @@ export function Pagination({
               className={cn(
                 'inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-medium',
                 p === page
-                  ? 'bg-brand-800 text-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                  ? 'bg-accent-400 text-[#0B0B0B]'
+                  : 'border border-[#2A2A2A] bg-[#151515] text-white/60 hover:bg-white/5 hover:text-white',
               )}
             >
               {p}
@@ -83,7 +83,7 @@ export function Pagination({
           aria-disabled={page >= totalPages}
           tabIndex={page >= totalPages ? -1 : undefined}
           className={cn(
-            'inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50',
+            'inline-flex h-8 items-center gap-1 rounded-lg border border-[#2A2A2A] bg-[#151515] px-3 text-xs font-medium text-white/60 hover:bg-white/5 hover:text-white',
             page >= totalPages && 'pointer-events-none opacity-40',
           )}
         >

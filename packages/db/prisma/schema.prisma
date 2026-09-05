@@ -126,6 +126,16 @@ enum InvoiceSource {
   POS    // Vente en caisse (point de vente)
 }
 
+enum DeliveryNoteStatus {
+  VALIDATED
+  CANCELLED
+}
+
+enum DeliveryNoteSource {
+  POS
+  MANUAL
+}
+
 enum NotificationType {
   NEW_ORDER
   NEW_QUOTE_REQUEST
@@ -160,6 +170,7 @@ model User {
   notifications  Notification[]
   customer       Customer?
   creditNotes    CreditNote[]     @relation("CreditNoteCreator")
+  deliveryNotes  DeliveryNote[]
 
   @@index([role])
   @@map("users")
@@ -181,6 +192,7 @@ model TaxRate {
   quoteItems         QuoteItem[]
   invoiceItems       InvoiceItem[]
   creditNoteItems    CreditNoteItem[]
+  deliveryNoteItems  DeliveryNoteItem[]
   purchaseOrderItems PurchaseOrderItem[]
   onlineOrderItems   OnlineOrderItem[]
 
@@ -193,16 +205,17 @@ model TaxRate {
 // ---------------------------------------------------------------------------
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  parentId    String?
-  taxRateId   String?
-  active      Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  parentId      String?
+  taxRateId     String?
+  markupPercent Decimal? @db.Decimal(5, 2) // Marge (%) sur prix de revient → prix HT
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryTree")
@@ -241,6 +254,7 @@ model Product {
   quoteItems         QuoteItem[]
   invoiceItems       InvoiceItem[]
   creditNoteItems    CreditNoteItem[]
+  deliveryNoteItems  DeliveryNoteItem[]
   purchaseOrderItems PurchaseOrderItem[]
   onlineOrderItems   OnlineOrderItem[]
 
@@ -416,6 +430,7 @@ model Customer {
   quotes       Quote[]
   invoices     Invoice[]
   creditNotes  CreditNote[]
+  deliveryNotes DeliveryNote[]
   onlineOrders OnlineOrder[]
 
   @@index([type])
@@ -512,6 +527,7 @@ model Invoice {
   items       InvoiceItem[]
   payments    Payment[]
   creditNotes CreditNote[]
+  deliveryNotes DeliveryNote[]
 
   @@index([customerId])
   @@index([status])
@@ -594,6 +610,58 @@ model CreditNoteItem {
 
   @@index([creditNoteId])
   @@map("credit_note_items")
+}
+
+// ---------------------------------------------------------------------------
+// Bons de livraison
+// ---------------------------------------------------------------------------
+
+model DeliveryNote {
+  id            String              @id @default(cuid())
+  number        String              @unique // BL-YYYY-######
+  customerId    String?
+  invoiceId     String?
+  createdById   String
+  source        DeliveryNoteSource  @default(POS)
+  status        DeliveryNoteStatus  @default(VALIDATED)
+  issueDate     DateTime            @default(now())
+  totalHT       Decimal             @db.Decimal(12, 3) @default(0)
+  totalTVA      Decimal             @db.Decimal(12, 3) @default(0)
+  totalTTC      Decimal             @db.Decimal(12, 3) @default(0)
+  notes         String?
+  validatedAt   DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  customer  Customer?           @relation(fields: [customerId], references: [id])
+  invoice   Invoice?            @relation(fields: [invoiceId], references: [id])
+  createdBy User                @relation(fields: [createdById], references: [id])
+  items     DeliveryNoteItem[]
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([issueDate])
+  @@map("delivery_notes")
+}
+
+model DeliveryNoteItem {
+  id              String  @id @default(cuid())
+  deliveryNoteId  String
+  productId       String?
+  sku             String  // Snapshot
+  designation     String  // Snapshot
+  quantity        Decimal @db.Decimal(14, 3)
+  unitPriceHT     Decimal @db.Decimal(12, 3)
+  taxRateId       String
+  lineTVA         Decimal @db.Decimal(12, 3)
+  lineTTC         Decimal @db.Decimal(12, 3)
+
+  deliveryNote DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+  product      Product?     @relation(fields: [productId], references: [id])
+  taxRate      TaxRate      @relation(fields: [taxRateId], references: [id])
+
+  @@index([deliveryNoteId])
+  @@map("delivery_note_items")
 }
 
 // ---------------------------------------------------------------------------

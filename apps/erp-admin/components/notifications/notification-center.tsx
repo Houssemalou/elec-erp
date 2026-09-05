@@ -16,13 +16,13 @@ type NotificationItem = {
 }
 
 const TYPE_META: Record<string, { icon: React.ReactNode; tone: string }> = {
-  NEW_ORDER: { icon: <ShoppingBag className="h-4 w-4" />, tone: 'bg-brand-600 text-white' },
-  NEW_QUOTE_REQUEST: { icon: <FileText className="h-4 w-4" />, tone: 'bg-brand-600 text-white' },
+  NEW_ORDER: { icon: <ShoppingBag className="h-4 w-4" />, tone: 'bg-accent-400 text-[#0B0B0B]' },
+  NEW_QUOTE_REQUEST: { icon: <FileText className="h-4 w-4" />, tone: 'bg-accent-400 text-[#0B0B0B]' },
   STOCK_ALERT: { icon: <AlertTriangle className="h-4 w-4" />, tone: 'bg-amber-500 text-white' },
-  PAYMENT_RECEIVED: { icon: <Wallet className="h-4 w-4" />, tone: 'bg-emerald-600 text-white' },
-  QUOTE_ACCEPTED: { icon: <FileCheck className="h-4 w-4" />, tone: 'bg-brand-500 text-white' },
-  STOCK_RECEIVED: { icon: <PackageCheck className="h-4 w-4" />, tone: 'bg-slate-600 text-white' },
-  SYSTEM: { icon: <Info className="h-4 w-4" />, tone: 'bg-slate-400 text-white' },
+  PAYMENT_RECEIVED: { icon: <Wallet className="h-4 w-4" />, tone: 'bg-emerald-500 text-white' },
+  QUOTE_ACCEPTED: { icon: <FileCheck className="h-4 w-4" />, tone: 'bg-accent-400 text-[#0B0B0B]' },
+  STOCK_RECEIVED: { icon: <PackageCheck className="h-4 w-4" />, tone: 'bg-white/20 text-white' },
+  SYSTEM: { icon: <Info className="h-4 w-4" />, tone: 'bg-white/10 text-white/70' },
 }
 
 const TYPE_SOUND: Record<string, { freq: number[]; dur: number }> = {
@@ -44,7 +44,6 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR')
 }
 
-/** Joueur de son via l'API Web Audio (aucun fichier requis). */
 function useChime(enabled: boolean) {
   return useCallback(
     (type: string) => {
@@ -88,7 +87,6 @@ export function NotificationCenter() {
   const panelRef = useRef<HTMLDivElement>(null)
   const playChime = useChime(soundEnabled)
 
-  // Activation du son après la première interaction utilisateur (autoplay).
   useEffect(() => {
     const enable = () => {
       setSoundEnabled(true)
@@ -140,7 +138,6 @@ export function NotificationCenter() {
     }
   }, [playChime, pushToast])
 
-  // Fermeture au clic extérieur
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false)
@@ -180,15 +177,15 @@ export function NotificationCenter() {
         {toasts.map((t) => {
           const m = meta(t.type)
           return (
-            <div key={t.id} className="animate-toast-in flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lifted">
+            <div key={t.id} className="animate-toast-in flex items-start gap-3 rounded-xl border border-[#2A2A2A] bg-[#151515] p-3 shadow-lifted">
               <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', m.tone)}>
                 {m.icon}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900">{t.title}</p>
-                <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{t.message}</p>
+                <p className="text-sm font-semibold text-white">{t.title}</p>
+                <p className="mt-0.5 line-clamp-2 text-xs text-white/50">{t.message}</p>
               </div>
-              <button onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))} className="text-white/40 hover:text-white/70">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -199,41 +196,41 @@ export function NotificationCenter() {
       {/* Bouton cloche */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-brand-800"
+        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-accent-400"
         aria-label="Notifications"
       >
         {unread > 0 ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
         {unread > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-500 px-1 text-[11px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-400 px-1 text-[11px] font-bold text-[#0B0B0B]">
             {unread > 99 ? '99+' : unread}
           </span>
         ) : null}
-        {unread > 0 && <span className="absolute right-1 top-1 h-2 w-2 animate-pulse-dot rounded-full bg-accent-500" />}
+        {unread > 0 && <span className="absolute right-1 top-1 h-2 w-2 animate-pulse-dot rounded-full bg-accent-400" />}
       </button>
 
       {/* Panneau */}
       {open ? (
-        <div className="absolute right-0 top-12 z-40 w-96 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lifted">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className="absolute right-0 top-12 z-40 w-96 overflow-hidden rounded-xl border border-[#2A2A2A] bg-[#151515] shadow-lifted">
+          <div className="flex items-center justify-between border-b border-[#2A2A2A] px-4 py-3">
             <div>
-              <p className="font-display text-sm font-semibold text-slate-900">Notifications</p>
+              <p className="font-display text-sm font-semibold text-white">Notifications</p>
               {soundEnabled ? (
-                <p className="text-[11px] text-emerald-600">Notifications sonores activées</p>
+                <p className="text-[11px] text-emerald-400">Notifications sonores activées</p>
               ) : (
-                <p className="text-[11px] text-slate-400">Son activé après le premier clic</p>
+                <p className="text-[11px] text-white/40">Son activé après le premier clic</p>
               )}
             </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={markAllRead}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-white/50 hover:bg-white/10"
                 title="Tout marquer comme lu"
               >
                 <CheckCheck className="h-3.5 w-3.5" /> Tout lire
               </button>
               <button
                 onClick={() => setOpen(false)}
-                className="rounded-md p-1 text-slate-400 hover:bg-slate-100"
+                className="rounded-md p-1 text-white/40 hover:bg-white/10"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -247,14 +244,14 @@ export function NotificationCenter() {
                   setSoundEnabled(true)
                   setHintVisible(false)
                 }}
-                className="flex w-full items-center gap-2 bg-accent-50 px-4 py-2.5 text-left text-xs font-medium text-accent-600 hover:bg-accent-100"
+                className="flex w-full items-center gap-2 bg-accent-400/10 px-4 py-2.5 text-left text-xs font-medium text-accent-400 hover:bg-accent-400/20"
               >
                 <BellRing className="h-4 w-4" />
                 Activer les notifications sonores
               </button>
             )}
             {items.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-slate-400">Aucune notification</p>
+              <p className="px-4 py-10 text-center text-sm text-white/40">Aucune notification</p>
             ) : (
               items.map((n) => {
                 const m = meta(n.type)
@@ -263,19 +260,19 @@ export function NotificationCenter() {
                     key={n.id}
                     onClick={() => markRead(n)}
                     className={cn(
-                      'flex w-full items-start gap-3 border-b border-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-50',
-                      !n.isRead && 'bg-brand-50/40',
+                      'flex w-full items-start gap-3 border-b border-[#2A2A2A] px-4 py-3 text-left transition-colors hover:bg-white/5',
+                      !n.isRead && 'bg-accent-400/5',
                     )}
                   >
                     <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', m.tone)}>
                       {m.icon}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-slate-900">{n.title}</span>
-                      <span className="mt-0.5 line-clamp-2 block text-xs text-slate-500">{n.message}</span>
-                      <span className="mt-1 block text-[11px] text-slate-400">{timeAgo(n.createdAt)}</span>
+                      <span className="block text-sm font-medium text-white">{n.title}</span>
+                      <span className="mt-0.5 line-clamp-2 block text-xs text-white/50">{n.message}</span>
+                      <span className="mt-1 block text-[11px] text-white/40">{timeAgo(n.createdAt)}</span>
                     </span>
-                    {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-500" />}
+                    {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-400" />}
                   </button>
                 )
               })

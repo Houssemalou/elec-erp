@@ -4,7 +4,7 @@ import { FileDown } from 'lucide-react'
 import { PageHeader, Card, CardHeader, Badge, Table, THead, TR, TH, TD, Button } from '@/components/ui'
 import { ActionButton } from '@/components/ui/action-button'
 import { DocumentTotals } from '@/components/documents/document-totals'
-import { CancelOrderButton, StatusUpdater } from '@/components/orders/order-actions'
+import { CancelOrderButton, StatusUpdater, GenerateInvoiceButton } from '@/components/orders/order-actions'
 import {
   confirmOrderAction,
   cancelOrderAction,
@@ -174,7 +174,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <ActionButton action={markOrderPaidAction.bind(null, id, 'CARD')} label="Marquer comme payée" variant="outline" />
               ) : null}
               {order.status === 'CONFIRMED' && !invoice ? (
-                <ActionButton action={createInvoiceFromOrderAction.bind(null, id)} label="Générer la facture" variant="secondary" />
+                <GenerateInvoiceButton id={id} action={createInvoiceFromOrderAction} />
               ) : null}
             </div>
           </Card>

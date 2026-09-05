@@ -28,7 +28,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
-        <div className="flex h-96 items-center justify-center overflow-hidden rounded-3xl border border-slate-200 bg-brand-50/50">
+        <div className="flex h-96 items-center justify-center overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-card)]">
           {image ? (
             <img src={image.url} alt={product.name} className="h-full w-full object-cover" />
           ) : (
@@ -37,22 +37,18 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         </div>
 
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-accent-600">
-            {product.brand ?? 'ElecShop'}
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent-400">
+            {product.brand ?? 'ElectroNova HA'}
           </p>
-          <h1 className="mt-2 font-display text-3xl font-bold text-brand-950">{product.name}</h1>
-          <p className="mt-1 font-mono text-sm text-slate-400">Réf. {product.sku}</p>
+          <h1 className="mt-2 font-display text-3xl font-bold text-[var(--text-primary)]">{product.name}</h1>
+          <p className="mt-1 font-mono text-sm text-[var(--text-muted)]">Réf. {product.sku}</p>
 
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Prix unitaire</p>
-                <p className="font-display text-3xl font-bold text-brand-950">{money(product.priceHT)}</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  HT · TVA {Number(product.taxRate.rate)}% incluse : {money(Number(product.priceHT) * (1 + Number(product.taxRate.rate) / 100))} TTC
-                </p>
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-card">
+<div className="flex items-end justify-between">
+                <div>
+                  <p className="font-display text-3xl font-bold text-accent-400">{money(Number(product.priceHT) * (1 + Number(product.taxRate.rate) / 100))}</p>
+                </div>
               </div>
-            </div>
             <AddToCart
               className="mt-5 w-full py-3.5"
               product={{
@@ -68,7 +64,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             />
             <Link
               href={`/demande-devis?produit=${product.slug}`}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 bg-white py-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-transparent py-3.5 text-sm font-semibold text-[var(--text-secondary)] transition-colors hover:border-accent-400/30 hover:text-accent-400"
             >
               <FileText className="h-4 w-4" /> Demander un devis pour ce produit
             </Link>
@@ -80,8 +76,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               { icon: <ShieldCheck className="h-5 w-5" />, label: 'Produit certifié' },
               { icon: <RotateCcw className="h-5 w-5" />, label: 'Retours possibles' },
             ].map((b) => (
-              <div key={b.label} className="rounded-2xl border border-slate-200 bg-white p-3 text-slate-600">
-                <div className="mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+              <div key={b.label} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-3 text-[var(--text-secondary)]">
+                <div className="mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-xl bg-accent-400/10 text-accent-400">
                   {b.icon}
                 </div>
                 <p className="text-xs font-medium">{b.label}</p>
@@ -91,8 +87,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
           {product.description ? (
             <div className="mt-6">
-              <h2 className="mb-2 font-display text-sm font-semibold text-brand-950">Description</h2>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">{product.description}</p>
+              <h2 className="mb-2 font-display text-sm font-semibold text-[var(--text-primary)]">Description</h2>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">{product.description}</p>
             </div>
           ) : null}
         </div>
@@ -100,7 +96,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
       {related.length > 0 ? (
         <section className="mt-16">
-          <h2 className="mb-6 font-display text-2xl font-bold text-brand-950">Dans la même catégorie</h2>
+          <h2 className="mb-6 font-display text-2xl font-bold text-[var(--text-primary)]">Dans la même catégorie</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {related.map((p) => (
               <ProductCard key={p.id} product={p} />

@@ -54,6 +54,11 @@ export default async function NewCategoryPage() {
               <Input type="number" name="sortOrder" defaultValue="0" />
             </div>
           </div>
+          <div>
+            <Label>Marge par défaut (%)</Label>
+            <Input type="number" step="0.01" min="0" name="markupPercent" placeholder="Ex : 30 pour +30% sur prix de revient" />
+            <p className="mt-1 text-xs text-white/40">Optionnel. Prix de vente HT = prix de revient × (1 + marge/100). L&apos;admin peut modifier le prix manuellement ensuite.</p>
+          </div>
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" name="active" defaultChecked className="h-4 w-4 rounded border-slate-300" />
             Catégorie active

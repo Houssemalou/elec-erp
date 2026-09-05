@@ -46,10 +46,10 @@ export function GlobalLoader() {
   if (!show) return null
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/30 backdrop-blur-[1px]">
-      <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-12 py-10 shadow-lifted ring-1 ring-slate-200">
-        <Loader2 className="h-9 w-9 animate-spin text-brand-600" />
-        <p className="text-sm font-semibold text-slate-700">Traitement en cours…</p>
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-[#151515] px-12 py-10 shadow-lifted ring-1 ring-[#2A2A2A]">
+        <Loader2 className="h-9 w-9 animate-spin text-accent-400" />
+        <p className="text-sm font-semibold text-white">Traitement en cours…</p>
       </div>
     </div>
   )

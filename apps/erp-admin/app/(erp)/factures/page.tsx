@@ -61,9 +61,9 @@ export default async function InvoicesPage({
         }
       />
       <Card>
-        <form className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4">
+        <form className="flex flex-wrap items-center gap-3 border-b border-[#2A2A2A] p-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
             <Input name="q" defaultValue={q} placeholder="N° de facture, client…" className="pl-9" />
           </div>
           <Select name="status" defaultValue={status} className="w-44">
@@ -74,7 +74,7 @@ export default async function InvoicesPage({
                 <option key={k} value={k}>{v}</option>
               ))}
           </Select>
-          <button type="submit" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <button type="submit" className="rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 py-2 text-sm font-medium text-white/70 hover:bg-[#1A1A1A]">
             Filtrer
           </button>
         </form>
@@ -96,9 +96,9 @@ export default async function InvoicesPage({
               const name = inv.customer.companyName || [inv.customer.firstName, inv.customer.lastName].filter(Boolean).join(' ') || 'Client'
               return (
                 <TR key={inv.id}>
-                  <TD className="font-mono text-xs font-medium text-brand-800">{inv.number}</TD>
+                  <TD className="font-mono text-xs font-medium text-white/70">{inv.number}</TD>
                   <TD>{formatDate(inv.issueDate)}</TD>
-                  <TD className="font-medium text-slate-900">{name}</TD>
+                  <TD className="font-medium text-white">{name}</TD>
                   <TD className="text-right">{money(inv.totalHT)}</TD>
                   <TD className="text-right">{money(inv.totalTVA)}</TD>
                   <TD className="text-right font-semibold">{money(inv.totalTTC)}</TD>
@@ -110,11 +110,11 @@ export default async function InvoicesPage({
                       <Link
                         href={`/api/pdf/invoice?id=${inv.id}`}
                         target="_blank"
-                        className="inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-medium text-brand-700 hover:bg-brand-50"
+                        className="inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-medium text-accent-400 hover:bg-accent-400/10"
                       >
                         <FileDown className="h-3.5 w-3.5" />
                       </Link>
-                      <Link href={`/factures/${inv.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                      <Link href={`/factures/${inv.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-white/60 hover:bg-white/5">
                         <Eye className="h-3.5 w-3.5" /> Voir
                       </Link>
                     </div>
@@ -124,7 +124,7 @@ export default async function InvoicesPage({
             })}
             {invoices.length === 0 ? (
               <TR>
-                <TD colSpan={8} className="py-12 text-center text-slate-400">Aucune facture</TD>
+                <TD colSpan={8} className="py-12 text-center text-white/40">Aucune facture</TD>
               </TR>
             ) : null}
           </tbody>

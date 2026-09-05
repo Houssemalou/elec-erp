@@ -106,8 +106,8 @@ export function PartyFormFields({
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input type="checkbox" name="active" defaultChecked={data?.active ?? true} className="h-4 w-4 rounded border-slate-300" />
+      <label className="flex items-center gap-2 text-sm text-white/70">
+        <input type="checkbox" name="active" defaultChecked={data?.active ?? true} className="h-4 w-4 rounded border-[#2A2A2A] accent-[#FFC400]" />
         {isClient ? 'Client actif' : 'Fournisseur actif'}
       </label>
     </>

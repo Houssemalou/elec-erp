@@ -51,24 +51,24 @@ export function DeleteButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+        className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
       >
         <Trash2 className="h-3.5 w-3.5" /> {label}
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#2A2A2A] bg-[#151515] p-6 shadow-xl">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-red-400">
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-display text-base font-semibold text-slate-900">Confirmer la suppression</h3>
-                <p className="text-xs text-slate-500">{message}</p>
+                <h3 className="font-display text-base font-semibold text-white">Confirmer la suppression</h3>
+                <p className="text-xs text-white/50">{message}</p>
               </div>
             </div>
-            {error ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+            {error ? <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p> : null}
             <div className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>
                 Annuler

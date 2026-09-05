@@ -50,7 +50,7 @@ export function ProgressBar() {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-[3px]">
       <div
-        className="h-full bg-gradient-to-r from-accent-500 via-accent-400 to-brand-500 transition-[width] duration-300 ease-out"
+        className="h-full bg-gradient-to-r from-accent-400 via-accent-300 to-accent-500 transition-[width] duration-300 ease-out"
         style={{ width: `${progress}%` }}
       />
     </div>

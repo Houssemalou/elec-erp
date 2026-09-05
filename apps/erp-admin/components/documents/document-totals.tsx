@@ -27,24 +27,24 @@ export function DocumentTotals({
   const remaining = Math.max(0, totalTTC - paid)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+    <div className="rounded-xl border border-[#2A2A2A] bg-[#0B0B0B] p-5">
       <dl className="space-y-2 text-sm">
         {Number(discountGlobal ?? 0) > 0 ? (
-          <div className="flex justify-between text-slate-600">
+          <div className="flex justify-between text-white/60">
             <dt>Remise globale</dt>
-            <dd className="font-medium text-red-600">− {money(discountGlobal ?? 0)}</dd>
+            <dd className="font-medium text-red-400">− {money(discountGlobal ?? 0)}</dd>
           </div>
         ) : null}
-        <div className="flex justify-between text-slate-600">
+        <div className="flex justify-between text-white/60">
           <dt>Total HT</dt>
-          <dd className="font-medium">{money(totalHT)}</dd>
+          <dd className="font-medium text-white">{money(totalHT)}</dd>
         </div>
-        <div className="flex justify-between text-slate-600">
+        <div className="flex justify-between text-white/60">
           <dt>Total TVA</dt>
-          <dd className="font-medium">{money(totalTVA)}</dd>
+          <dd className="font-medium text-white">{money(totalTVA)}</dd>
         </div>
         {breakdown.length > 0 ? (
-          <div className="space-y-1 border-t border-slate-200 pt-2 text-xs text-slate-400">
+          <div className="space-y-1 border-t border-[#2A2A2A] pt-2 text-xs text-white/40">
             {breakdown.map((b) => (
               <div key={b.rate} className="flex justify-between">
                 <span>dont TVA {b.rate}%</span>
@@ -54,23 +54,23 @@ export function DocumentTotals({
           </div>
         ) : null}
         {Number(timbreFiscal ?? 0) > 0 ? (
-          <div className="flex justify-between text-slate-600">
+          <div className="flex justify-between text-white/60">
             <dt>Timbre fiscal</dt>
-            <dd className="font-medium">{money(timbreFiscal ?? 0)}</dd>
+            <dd className="font-medium text-white">{money(timbreFiscal ?? 0)}</dd>
           </div>
         ) : null}
-        <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-brand-950">
+        <div className="flex justify-between border-t border-[#2A2A2A] pt-2 text-base font-bold text-white">
           <dt>Total TTC</dt>
           <dd>{money(totalTTC)}</dd>
         </div>
         {paidAmount !== undefined ? (
           <>
-            <div className="flex justify-between text-emerald-700">
+            <div className="flex justify-between text-emerald-400">
               <dt>Déjà payé</dt>
               <dd className="font-semibold">{money(paid)}</dd>
             </div>
             {remaining > 0.001 ? (
-              <div className="flex justify-between text-red-600">
+              <div className="flex justify-between text-red-400">
                 <dt>Reste à payer</dt>
                 <dd className="font-semibold">{money(remaining)}</dd>
               </div>
