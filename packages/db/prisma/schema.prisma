@@ -49,6 +49,12 @@ enum PurchaseOrderStatus {
   CANCELLED
 }
 
+enum PurchaseInvoiceStatus {
+  DRAFT
+  VALIDATED
+  CANCELLED
+}
+
 enum CustomerType {
   PARTICULIER
   PROFESSIONNEL
@@ -162,15 +168,16 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  stockMovements StockMovement[]
-  purchaseOrders PurchaseOrder[]  @relation("PurchaseOrderCreator")
-  quotes         Quote[]          @relation("QuoteCreator")
-  invoices       Invoice[]        @relation("InvoiceCreator")
-  payments       Payment[]
-  notifications  Notification[]
-  customer       Customer?
-  creditNotes    CreditNote[]     @relation("CreditNoteCreator")
-  deliveryNotes  DeliveryNote[]
+  stockMovements  StockMovement[]
+  purchaseOrders  PurchaseOrder[]   @relation("PurchaseOrderCreator")
+  purchaseInvoices PurchaseInvoice[] @relation("PurchaseInvoiceCreator")
+  quotes          Quote[]           @relation("QuoteCreator")
+  invoices        Invoice[]         @relation("InvoiceCreator")
+  payments        Payment[]
+  notifications   Notification[]
+  customer        Customer?
+  creditNotes     CreditNote[]     @relation("CreditNoteCreator")
+  deliveryNotes   DeliveryNote[]
 
   @@index([role])
   @@map("users")
@@ -194,6 +201,7 @@ model TaxRate {
   creditNoteItems    CreditNoteItem[]
   deliveryNoteItems  DeliveryNoteItem[]
   purchaseOrderItems PurchaseOrderItem[]
+  purchaseInvoiceItems PurchaseInvoiceItem[]
   onlineOrderItems   OnlineOrderItem[]
 
   @@index([rate])
@@ -256,6 +264,7 @@ model Product {
   creditNoteItems    CreditNoteItem[]
   deliveryNoteItems  DeliveryNoteItem[]
   purchaseOrderItems PurchaseOrderItem[]
+  purchaseInvoiceItems PurchaseInvoiceItem[]
   onlineOrderItems   OnlineOrderItem[]
 
   @@index([categoryId])
@@ -357,6 +366,7 @@ model Supplier {
   updatedAt       DateTime @updatedAt
 
   purchaseOrders PurchaseOrder[]
+  purchaseInvoices PurchaseInvoice[]
 
   @@index([active])
   @@map("suppliers")
@@ -402,6 +412,63 @@ model PurchaseOrderItem {
 
   @@index([purchaseOrderId])
   @@map("purchase_order_items")
+}
+
+// ---------------------------------------------------------------------------
+// Factures d'achat (factures reçues des fournisseurs)
+// ---------------------------------------------------------------------------
+
+model PurchaseInvoice {
+  id             String               @id @default(cuid())
+  number         String               @unique // ACH-YYYY-######
+  supplierId     String
+  status         PurchaseInvoiceStatus @default(DRAFT)
+  issueDate      DateTime             @default(now())
+  dueDate        DateTime?
+  totalHT        Decimal              @db.Decimal(12, 3) @default(0)
+  totalTVA       Decimal              @db.Decimal(12, 3) @default(0)
+  totalTTC       Decimal              @db.Decimal(12, 3) @default(0)
+  timbreFiscal   Decimal              @db.Decimal(12, 3) @default(1) // Timbre repris de la facture fournisseur
+  discountGlobal Decimal              @db.Decimal(12, 3) @default(0)
+  vatBreakdown   Json                 @default("{}")
+  notes          String?
+  receivedAt     DateTime? // Date de validation (stock incrémenté)
+  createdById    String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  supplier  Supplier              @relation(fields: [supplierId], references: [id])
+  createdBy User                  @relation("PurchaseInvoiceCreator", fields: [createdById], references: [id])
+  items     PurchaseInvoiceItem[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([issueDate])
+  @@map("purchase_invoices")
+}
+
+model PurchaseInvoiceItem {
+  id                 String       @id @default(cuid())
+  purchaseInvoiceId  String
+  productId          String?
+  sku                String // Référence (snapshot)
+  designation        String // Désignation (snapshot)
+  quantity           Decimal      @db.Decimal(14, 3)
+  unitPriceHT        Decimal      @db.Decimal(12, 3) // Prix d'achat (coût)
+  discountType       DiscountType?
+  discountValue      Decimal      @db.Decimal(12, 3) @default(0)
+  netUnitPrice       Decimal      @db.Decimal(12, 3)
+  lineHT             Decimal      @db.Decimal(12, 3)
+  taxRateId          String
+  lineTVA            Decimal      @db.Decimal(12, 3)
+  lineTTC            Decimal      @db.Decimal(12, 3)
+
+  purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+  product         Product?       @relation(fields: [productId], references: [id])
+  taxRate         TaxRate        @relation(fields: [taxRateId], references: [id])
+
+  @@index([purchaseInvoiceId])
+  @@map("purchase_invoice_items")
 }
 
 // ---------------------------------------------------------------------------
@@ -777,7 +844,7 @@ model Notification {
 
 model Sequence {
   id         String @id @default(cuid())
-  prefix     String // FAC, DEV, AV, OC, BON, TRF
+  prefix     String // FAC, DEV, AV, OC, BON, ACH, TRF
   year       Int
   lastNumber Int    @default(0)
 

@@ -25,6 +25,9 @@ import {
   createPurchaseOrder,
   receivePurchaseOrder,
   setPurchaseOrderStatus,
+  createPurchaseInvoice,
+  validatePurchaseInvoice,
+  cancelPurchaseInvoice,
   confirmOrder,
   cancelOrder,
   updateOrderStatus,
@@ -544,7 +547,11 @@ export async function deleteSupplier(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
   if (!user) return { success: false, error: 'Accès non autorisé' }
   const used = await db.purchaseOrder.count({ where: { supplierId: id } })
+  const usedInvoices = await db.purchaseInvoice.count({ where: { supplierId: id } })
   if (used > 0) return { success: false, error: 'Impossible de supprimer : des bons de commande existent.' }
+  if (usedInvoices > 0) {
+    return { success: false, error: 'Impossible de supprimer : des factures d’achat existent.' }
+  }
   await db.supplier.delete({ where: { id } })
   revalidatePath('/fournisseurs')
   return { success: true }
@@ -815,6 +822,65 @@ export async function setPurchaseOrderStatusAction(id: string, status: string): 
   revalidatePath('/achats')
   revalidatePath(`/achats/${id}`)
   return { success: true }
+}
+
+// ============================================================================
+// Factures d'achat (achats) — factures reçues des fournisseurs
+// ============================================================================
+
+export async function createPurchaseInvoiceAction(fd: FormData): Promise<ActionResult> {
+  const user = await clean(STAFF_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  const supplierId = str(fd, 'supplierId')
+  if (!supplierId) return { success: false, error: 'Le fournisseur est obligatoire' }
+  const lines = parseLines(fd)
+  if (lines.length === 0) return { success: false, error: 'Ajoutez au moins une ligne' }
+
+  try {
+    const inv = await createPurchaseInvoice({
+      supplierId,
+      createdById: user.id,
+      issueDate: str(fd, 'issueDate') || null,
+      dueDate: str(fd, 'dueDate') || null,
+      globalDiscountType: (str(fd, 'globalDiscountType') || null) as 'PERCENT' | 'AMOUNT' | null,
+      globalDiscountValue: num(fd, 'globalDiscountValue'),
+      notes: str(fd, 'notes') || null,
+      lines,
+    })
+    revalidatePath('/achats')
+    return { success: true, id: inv.id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function validatePurchaseInvoiceAction(id: string): Promise<ActionResult> {
+  const user = await clean(STAFF_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await validatePurchaseInvoice(id, user.id)
+    revalidatePath('/achats')
+    revalidatePath(`/achats/${id}`)
+    revalidatePath('/stock')
+    revalidatePath('/finance')
+    return { success: true, id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function cancelPurchaseInvoiceAction(id: string): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await cancelPurchaseInvoice(id, user.id)
+    revalidatePath('/achats')
+    revalidatePath(`/achats/${id}`)
+    revalidatePath('/finance')
+    return { success: true, id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
 }
 
 // ============================================================================

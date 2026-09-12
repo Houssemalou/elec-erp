@@ -108,7 +108,7 @@ export default async function InvoicesPage({
                   <TD className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Link
-                        href={`/api/pdf/invoice?id=${inv.id}`}
+                        href={`/api/pdf/invoice?id=${inv.id}&vat=0`}
                         target="_blank"
                         className="inline-flex h-8 items-center rounded-lg px-2.5 text-xs font-medium text-accent-400 hover:bg-accent-400/10"
                       >

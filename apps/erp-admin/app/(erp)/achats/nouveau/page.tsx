@@ -1,11 +1,11 @@
 import { PageHeader, Card } from '@/components/ui'
 import { DocumentForm } from '@/components/documents/document-form'
-import { createPurchaseOrderAction } from '@/lib/actions/erp'
+import { createPurchaseInvoiceAction } from '@/lib/actions/erp'
 import { db } from '@elec/db'
 
 export const dynamic = 'force-dynamic'
 
-export default async function NewPurchaseOrderPage() {
+export default async function NewPurchaseInvoicePage() {
   const [suppliers, products] = await Promise.all([
     db.supplier.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     db.product.findMany({
@@ -19,19 +19,30 @@ export default async function NewPurchaseOrderPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <PageHeader title="Nouveau bon de commande" description="Commandez de la marchandise à un fournisseur." />
+      <PageHeader
+        title="Nouvelle facture d'achat"
+        description="Enregistrez une facture reçue de votre fournisseur (PU HT = prix d'achat du produit)."
+      />
       <Card className="p-6">
         <DocumentForm
           partyLabel="Fournisseur"
           partyFieldName="supplierId"
           partyOptions={suppliers.map((s) => ({ id: s.id, label: supplierLabel(s) }))}
-          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), taxRate: Number(p.taxRate.rate) }))}
-          submitAction={createPurchaseOrderAction}
+          products={products.map((p) => ({
+            id: p.id,
+            sku: p.sku,
+            name: p.name,
+            priceHT: Number(p.priceHT),
+            costPrice: p.costPrice != null ? Number(p.costPrice) : null,
+            taxRate: Number(p.taxRate.rate),
+          }))}
+          submitAction={createPurchaseInvoiceAction}
           successPath="/achats"
-          submitLabel="Créer le bon de commande"
-          dateLabel="Livraison prévue"
-          dateName="expectedDate"
-          defaultConditions=""
+          submitLabel="Créer la facture d'achat"
+          dateLabel="Date de la facture"
+          dateName="issueDate"
+          extraDate={{ label: 'Échéance', name: 'dueDate', default: '' }}
+          unitPriceFrom="cost"
         />
       </Card>
     </div>

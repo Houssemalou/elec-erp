@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { FileDown, FileText, Printer } from 'lucide-react'
-import { PageHeader, Card, CardHeader, Badge, Table, THead, TR, TH, TD, Button } from '@/components/ui'
+import { FileText } from 'lucide-react'
+import { PageHeader, Card, CardHeader, Badge, Table, THead, TR, TH, TD } from '@/components/ui'
 import { ActionButton } from '@/components/ui/action-button'
 import { DocumentTotals } from '@/components/documents/document-totals'
 import { PaymentForm } from '@/components/documents/payment-form'
+import { InvoiceGenerateDialog } from '@/components/documents/invoice-generate-dialog'
 import {
   validateInvoiceAction,
   cancelInvoiceAction,
@@ -56,16 +57,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         description={`Créée par ${invoice.createdBy.name} le ${formatDate(invoice.createdAt)}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <a href={`/api/pdf/invoice?id=${invoice.id}`} target="_blank" rel="noreferrer">
-              <Button variant="outline">
-                <FileDown className="h-4 w-4" /> PDF
-              </Button>
-            </a>
-            <a href={`/print/facture/${invoice.id}`} target="_blank" rel="noreferrer">
-              <Button variant="outline">
-                <Printer className="h-4 w-4" /> Imprimer
-              </Button>
-            </a>
+            <InvoiceGenerateDialog invoiceId={invoice.id} />
           </div>
         }
       />

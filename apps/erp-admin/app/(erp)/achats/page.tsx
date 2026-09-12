@@ -9,13 +9,11 @@ export const dynamic = 'force-dynamic'
 
 const statusTone: Record<string, 'green' | 'blue' | 'amber' | 'red' | 'slate' | 'accent'> = {
   DRAFT: 'slate',
-  SENT: 'blue',
-  PARTIALLY_RECEIVED: 'amber',
-  RECEIVED: 'green',
+  VALIDATED: 'green',
   CANCELLED: 'red',
 }
 
-export default async function PurchaseOrdersPage({
+export default async function PurchaseInvoicesPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; status?: string; page?: string }>
@@ -34,9 +32,9 @@ export default async function PurchaseOrdersPage({
     ]
   }
 
-  const [total, orders] = await Promise.all([
-    db.purchaseOrder.count({ where }),
-    db.purchaseOrder.findMany({
+  const [total, invoices] = await Promise.all([
+    db.purchaseInvoice.count({ where }),
+    db.purchaseInvoice.findMany({
       where,
       include: { supplier: true, _count: { select: { items: true } } },
       orderBy: { createdAt: 'desc' },
@@ -49,12 +47,12 @@ export default async function PurchaseOrdersPage({
   return (
     <div>
       <PageHeader
-        title="Bons de commande"
-        description={`${total} bons de commande fournisseurs`}
+        title="Factures d'achat"
+        description={`${total} factures d'achat fournisseurs`}
         actions={
           <Link href="/achats/nouveau">
             <Button>
-              <Plus className="h-4 w-4" /> Nouveau bon de commande
+              <Plus className="h-4 w-4" /> Nouvelle facture d&apos;achat
             </Button>
           </Link>
         }
@@ -63,12 +61,12 @@ export default async function PurchaseOrdersPage({
         <form className="flex flex-wrap items-center gap-3 border-b border-[#2A2A2A] p-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-            <Input name="q" defaultValue={q} placeholder="N° de bon, fournisseur…" className="pl-9" />
+            <Input name="q" defaultValue={q} placeholder="N° de facture, fournisseur…" className="pl-9" />
           </div>
           <Select name="status" defaultValue={status} className="w-44">
             <option value="">Tous les statuts</option>
             {Object.entries(STATUS_LABELS)
-              .filter(([k]) => ['DRAFT', 'SENT', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'].includes(k))
+              .filter(([k]) => ['DRAFT', 'VALIDATED', 'CANCELLED'].includes(k))
               .map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
@@ -83,19 +81,19 @@ export default async function PurchaseOrdersPage({
               <TH>N°</TH>
               <TH>Date</TH>
               <TH>Fournisseur</TH>
-              <TH>Livraison prévue</TH>
+              <TH>Échéance</TH>
               <TH className="text-right">Montant</TH>
               <TH>Statut</TH>
               <TH className="text-right">Actions</TH>
             </TR>
           </THead>
           <tbody>
-            {orders.map((o) => (
+            {invoices.map((o) => (
               <TR key={o.id}>
                 <TD className="font-mono text-xs font-medium text-white/70">{o.number}</TD>
-                <TD>{formatDate(o.createdAt)}</TD>
+                <TD>{formatDate(o.issueDate)}</TD>
                 <TD className="font-medium text-white">{o.supplier.name}</TD>
-                <TD>{o.expectedDate ? formatDate(o.expectedDate) : '—'}</TD>
+                <TD>{o.dueDate ? formatDate(o.dueDate) : '—'}</TD>
                 <TD className="text-right font-semibold">{money(o.totalTTC)}</TD>
                 <TD>
                   <Badge tone={statusTone[o.status] ?? 'slate'}>{STATUS_LABELS[o.status] ?? o.status}</Badge>
@@ -107,9 +105,9 @@ export default async function PurchaseOrdersPage({
                 </TD>
               </TR>
             ))}
-            {orders.length === 0 ? (
+            {invoices.length === 0 ? (
               <TR>
-                <TD colSpan={7} className="py-12 text-center text-white/40">Aucun bon de commande</TD>
+                <TD colSpan={7} className="py-12 text-center text-white/40">Aucune facture d&apos;achat</TD>
               </TR>
             ) : null}
           </tbody>

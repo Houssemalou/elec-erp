@@ -66,13 +66,18 @@ function vatRows(breakdown: unknown) {
 
 export default async function PrintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ type: string; id: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const session = await auth()
   if (!session?.user || !STAFF_ROLES.includes(session.user.role)) redirect('/login')
 
   const { type, id } = await params
+  const sp = await searchParams
+  const withVat = sp.vat === '0' ? false : true
+  const sommeEnLettres = typeof sp.somme === 'string' && sp.somme ? sp.somme : undefined
   const settings = await getStoreSettings()
   const store = {
     name: settings.storeName,
@@ -149,6 +154,9 @@ export default async function PrintPage({
       totalTVA: Number(invoice.totalTVA),
       timbreFiscal: Number(invoice.timbreFiscal),
       totalTTC: Number(invoice.totalTTC),
+      showVat: withVat,
+      nonAssujettiTva: !withVat,
+      sommeEnLettres,
       notes: invoice.notes,
       conditions: null,
       store,

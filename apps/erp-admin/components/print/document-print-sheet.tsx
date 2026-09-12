@@ -48,10 +48,16 @@ export interface PrintDocument {
   totalTVA: number
   timbreFiscal: number
   totalTTC: number
+  showVat?: boolean
+  nonAssujettiTva?: boolean
+  sommeEnLettres?: string
   notes?: string | null
   conditions?: string | null
   store: PrintStore
 }
+
+const NON_ASSUJETTI =
+  'Entreprise non assujettie à la TVA conformément à l’article 18 du Code de la TVA'
 
 const fmt = (n: number) => {
   const fixed = n.toFixed(3)
@@ -59,9 +65,12 @@ const fmt = (n: number) => {
   return stripped.replace('.', ',')
 }
 
-function buildColumns(lines: PrintLine[]): string {
+function buildColumns(lines: PrintLine[], showVat: boolean): string {
   const maxLen = lines.reduce((max, l) => Math.max(max, l.sku.length), 4)
   const refW = Math.max(maxLen * 5.5 + 8, 36)
+  if (!showVat) {
+    return [`${refW}px`, 'minmax(100px, 1fr)', '38px', '52px', '42px', '64px'].join(' ')
+  }
   return [
     `${refW}px`,
     'minmax(80px, 1fr)',
@@ -84,7 +93,12 @@ const BRH = 'border-r border-slate-300'
 
 export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const dateStr = doc.date.toLocaleDateString('fr-FR')
-  const gridCols = buildColumns(doc.lines)
+  const showVat = doc.showVat !== false
+  const netAPayer = showVat
+    ? doc.totalTTC
+    : doc.totalHTAfterDiscount + doc.timbreFiscal
+  const fillCells = showVat ? 9 : 6
+  const gridCols = buildColumns(doc.lines, showVat)
 
   return (
     <div className="print-sheet mx-auto flex h-[275mm] w-[210mm] flex-col overflow-hidden rounded-lg bg-white p-[10mm_12mm_0] shadow-lifted">
@@ -141,10 +155,14 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
         <div className={`${CN} ${BRH} ${H}`}>Qté</div>
         <div className={`${CN} ${BRH} ${H}`}>P.U. HT</div>
         <div className={`${CN} ${BRH} ${H}`}>Remise</div>
-        <div className={`${CN} ${BRH} ${H}`}>Prix HT</div>
-        <div className={`${CN} ${BRH} ${H}`}>TVA</div>
-        <div className={`${CN} ${BRH} ${H}`}>Mt TVA</div>
-        <div className={`${CN} ${H}`}>TTC</div>
+        <div className={`${CN} ${H}`}>{showVat ? 'Prix HT' : 'Montant HT'}</div>
+        {showVat ? (
+          <>
+            <div className={`${CN} ${BRH} ${H}`}>TVA</div>
+            <div className={`${CN} ${BRH} ${H}`}>Mt TVA</div>
+            <div className={`${CN} ${H}`}>TTC</div>
+          </>
+        ) : null}
 
         {/* Data rows */}
         {doc.lines.map((l, i) => (
@@ -154,27 +172,34 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
             <div className={`${CN} ${BR}`}>{fmt(l.quantity)}</div>
             <div className={`${CN} ${BR}`}>{fmt(l.unitPriceHT)}</div>
             <div className={`${CN} ${BR}`}>{l.discountLabel || '—'}</div>
-            <div className={`${CN} ${BR}`}>{fmt(l.lineHT)}</div>
-            <div className={`${CN} ${BR}`}>{fmt(l.taxRate)}</div>
-            <div className={`${CN} ${BR}`}>{fmt(l.lineTVA)}</div>
-            <div className={CN}>{fmt(l.lineTTC)}</div>
+            {showVat ? (
+              <>
+                <div className={`${CN} ${BR}`}>{fmt(l.lineHT)}</div>
+                <div className={`${CN} ${BR}`}>{fmt(l.taxRate)}</div>
+                <div className={`${CN} ${BR}`}>{fmt(l.lineTVA)}</div>
+                <div className={CN}>{fmt(l.lineTTC)}</div>
+              </>
+            ) : (
+              <div className={CN}>{fmt(l.lineHT)}</div>
+            )}
           </div>
         ))}
 
         {/* Fill row — 1fr extends vertical lines to grid bottom border */}
-        <div className={BR} />
-        <div className={BR} />
-        <div className={BR} />
-        <div className={BR} />
-        <div className={BR} />
-        <div className={BR} />
-        <div className={BR} />
-        <div className={BR} />
+        {Array.from({ length: fillCells }).map((_, i) => (
+          <div key={`fill-${i}`} className={BR} />
+        ))}
         <div />
       </div>
 
       {/* ── Bottom zone — normal flow on screen, fixed at page bottom in print ── */}
       <div className="print-footer shrink-0 pt-2">
+        {doc.nonAssujettiTva ? (
+          <p className="mx-auto mb-2 flex w-fit items-center justify-center rounded border border-slate-800 px-4 py-1 text-center text-[9px] font-bold text-slate-900">
+            {NON_ASSUJETTI}
+          </p>
+        ) : null}
+
         <div className="flex items-end justify-between">
           <div>
             <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Cachet &amp; signature</p>
@@ -197,21 +222,28 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
               <span className="text-slate-500">Total HT après remise</span>
               <span className="font-medium">{money(doc.totalHTAfterDiscount)}</span>
             </div>
-            {doc.vatBreakdown.map((b) => (
-              <div key={b.rate} className="flex justify-between">
-                <span className="text-slate-500">TVA {fmt(b.rate)}%</span>
-                <span className="font-medium">{money(b.tva)}</span>
-              </div>
-            ))}
+            {showVat
+              ? doc.vatBreakdown.map((b) => (
+                  <div key={b.rate} className="flex justify-between">
+                    <span className="text-slate-500">TVA {fmt(b.rate)}%</span>
+                    <span className="font-medium">{money(b.tva)}</span>
+                  </div>
+                ))
+              : null}
             {doc.timbreFiscal > 0 ? (
               <div className="flex justify-between">
                 <span className="text-slate-500">Timbre fiscal</span>
                 <span className="font-medium">{money(doc.timbreFiscal)}</span>
               </div>
             ) : null}
+            {doc.sommeEnLettres ? (
+              <div className="mt-1 rounded border border-slate-300 px-2 py-1 text-[9px] font-medium leading-snug text-slate-800">
+                {doc.sommeEnLettres}
+              </div>
+            ) : null}
             <div className="flex justify-between border-t border-slate-800 pt-0.5 text-[10px] font-bold text-slate-900">
-              <span>Total TTC — Net à payer</span>
-              <span>{money(doc.totalTTC)}</span>
+              <span>{showVat ? 'Total TTC — Net à payer' : 'Net à payer'}</span>
+              <span>{money(netAPayer)}</span>
             </div>
           </div>
         </div>

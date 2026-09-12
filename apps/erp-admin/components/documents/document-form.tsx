@@ -24,6 +24,7 @@ export interface ProductOption {
   sku: string
   name: string
   priceHT: number
+  costPrice?: number | null
   taxRate: number
 }
 
@@ -47,6 +48,8 @@ interface DocumentFormProps {
   partyCompanyName?: boolean
   extraDate?: { label: string; name: string; default: string }
   reason?: boolean
+  /** Prix par défaut appliqué à l'ajout d'un produit : prix de vente (valeur par défaut) ou coût d'achat. */
+  unitPriceFrom?: 'sale' | 'cost'
 }
 
 let lineSeq = 0
@@ -72,6 +75,7 @@ export function DocumentForm({
   partyCompanyName = false,
   extraDate,
   reason = false,
+  unitPriceFrom = 'sale',
 }: DocumentFormProps) {
   const router = useRouter()
   const [lines, setLines] = useState<DocLine[]>(defaultLines)
@@ -92,11 +96,13 @@ export function DocumentForm({
 
   const pickProduct = (key: string, productId: string) => {
     const p = products.find((x) => x.id === productId)
+    const defaultPrice =
+      unitPriceFrom === 'cost' ? (p?.costPrice != null ? String(p.costPrice) : '') : p ? String(p.priceHT) : ''
     updateLine(key, {
       productId,
       sku: p?.sku ?? '',
       designation: p?.name ?? '',
-      unitPriceHT: p ? String(p.priceHT) : '',
+      unitPriceHT: defaultPrice,
       taxRate: p?.taxRate ?? 0,
     })
   }

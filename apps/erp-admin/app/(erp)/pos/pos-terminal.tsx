@@ -20,6 +20,7 @@ import {
   FileText,
   Receipt,
   Printer,
+  LayoutGrid,
 } from 'lucide-react'
 
 type Product = {
@@ -79,6 +80,7 @@ export default function PosTerminal({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [customerId, setCustomerId] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD'>('CASH')
@@ -97,16 +99,28 @@ export default function PosTerminal({
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE')
   const [discountValue, setDiscountValue] = useState('')
 
+  const categories = useMemo(() => {
+  const counts = new Map<string, number>()
+  for (const p of products) {
+    if (p.categoryName) counts.set(p.categoryName, (counts.get(p.categoryName) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([name, count]) => ({ name, count }))
+}, [products])
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return products
-    const q = search.toLowerCase()
-    return products.filter(
-      (p) =>
+    return products.filter((p) => {
+      if (category && p.categoryName !== category) return false
+      if (!search.trim()) return true
+      const q = search.toLowerCase()
+      return (
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q) ||
-        (p.categoryName ?? '').toLowerCase().includes(q),
-    )
-  }, [products, search])
+        (p.categoryName ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [products, search, category])
 
   const handlePrintReceipt = useCallback(() => {
     const receiptEl = document.getElementById('pos-receipt-print')
@@ -338,6 +352,36 @@ export default function PosTerminal({
               autoFocus
             />
           </div>
+        </div>
+        <div className="flex gap-2 overflow-x-auto border-b border-[#2A2A2A] px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setCategory('')}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              !category
+                ? 'border-accent-400 bg-accent-400 text-[#0B0B0B]'
+                : 'border-[#2A2A2A] bg-[#151515] text-white/60 hover:bg-[#1A1A1A]'
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Tous
+            <span className="opacity-70">({products.length})</span>
+          </button>
+          {categories.map((c) => (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => setCategory(category === c.name ? '' : c.name)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                category === c.name
+                  ? 'border-accent-400 bg-accent-400 text-[#0B0B0B]'
+                  : 'border-[#2A2A2A] bg-[#151515] text-white/60 hover:bg-[#1A1A1A]'
+              }`}
+            >
+              {c.name}
+              <span className="opacity-70">({c.count})</span>
+            </button>
+          ))}
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">

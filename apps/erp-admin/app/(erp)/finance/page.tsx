@@ -40,13 +40,13 @@ function KpiCard({
 }
 
 export default async function FinancePage() {
-  const [invoices, creditNotes, purchaseOrders] = await Promise.all([
+  const [invoices, creditNotes, purchaseInvoices] = await Promise.all([
     db.invoice.findMany({
       where: { status: { in: [InvoiceStatus.VALIDATED, InvoiceStatus.PAID, InvoiceStatus.PARTIALLY_PAID] } },
       include: { customer: true },
     }),
     db.creditNote.findMany({ where: { status: 'VALIDATED' } }),
-    db.purchaseOrder.findMany({ where: { status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED', 'SENT'] } } }),
+    db.purchaseInvoice.findMany({ where: { status: 'VALIDATED' } }),
   ])
 
   const revenue = invoices.reduce((s, i) => s + Number(i.totalTTC), 0)
@@ -55,7 +55,7 @@ export default async function FinancePage() {
   const tvaCollected = invoices.reduce((s, i) => s + Number(i.totalTVA), 0)
   const salesHT = invoices.reduce((s, i) => s + Number(i.totalHT), 0)
   const credits = creditNotes.reduce((s, n) => s + Number(n.totalTTC), 0)
-  const purchases = purchaseOrders.reduce((s, p) => s + Number(p.totalTTC), 0)
+  const purchases = purchaseInvoices.reduce((s, p) => s + Number(p.totalTTC), 0)
 
   const monthKeys = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(new Date().getFullYear(), new Date().getMonth() - (5 - i), 1)

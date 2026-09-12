@@ -31,7 +31,7 @@ export default async function SuppliersPage({
     db.supplier.count({ where }),
     db.supplier.findMany({
       where,
-      include: { _count: { select: { purchaseOrders: true } } },
+      include: { _count: { select: { purchaseInvoices: true } } },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -66,7 +66,7 @@ export default async function SuppliersPage({
               <TH>Société</TH>
               <TH>Matricule fiscal</TH>
               <TH>Contact</TH>
-              <TH className="text-right">Bons de commande</TH>
+              <TH className="text-right">Factures d&apos;achat</TH>
               <TH>Statut</TH>
               <TH className="text-right">Actions</TH>
             </TR>
@@ -78,7 +78,7 @@ export default async function SuppliersPage({
                 <TD>{s.company ?? '—'}</TD>
                 <TD className="font-mono text-xs text-slate-500">{s.matriculeFiscal ?? '—'}</TD>
                 <TD>{s.phone ?? s.email ?? '—'}</TD>
-                <TD className="text-right">{s._count.purchaseOrders}</TD>
+                <TD className="text-right">{s._count.purchaseInvoices}</TD>
                 <TD>
                   <Badge tone={s.active ? 'green' : 'slate'}>{s.active ? 'Actif' : 'Inactif'}</Badge>
                 </TD>

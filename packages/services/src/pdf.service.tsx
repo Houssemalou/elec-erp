@@ -68,6 +68,29 @@ const styles = StyleSheet.create({
   colTva: { width: '8%' },
   colMtTva: { width: '9%' },
   colTtc: { width: '8%' },
+  colSkuN: { width: '12%' },
+  colDesignationN: { width: '38%' },
+  colQtyN: { width: '9%' },
+  colPuN: { width: '13%' },
+  colRemiseN: { width: '10%' },
+  colPrixHTN: { width: '18%' },
+  noticeBox: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    padding: 6,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  noticeText: { fontSize: 8, fontWeight: 700, textAlign: 'center' },
+  sommeBox: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderStyle: 'dashed',
+    padding: 4,
+    marginTop: 6,
+    alignItems: 'center',
+  },
+  sommeText: { fontSize: 8, fontWeight: 700, textAlign: 'center' },
   bottomRow: {
     position: 'absolute',
     left: 40,
@@ -120,6 +143,9 @@ export interface PdfDocumentData {
   totalTVA: number
   timbreFiscal: number
   totalTTC: number
+  showVat?: boolean
+  nonAssujettiTva?: boolean
+  sommeEnLettres?: string
   store: {
     name: string
     slogan?: string | null
@@ -138,6 +164,10 @@ export interface PdfDocumentData {
 function PdfDocumentView({ data }: { data: PdfDocumentData }) {
   const dateStr = data.date.toLocaleDateString('fr-FR')
   const emptyRows = Math.max(0, 12 - data.lines.length)
+  const showVat = data.showVat !== false
+  const netAPayer = showVat
+    ? data.totalTTC
+    : data.totalHTBeforeGlobal - data.discountGlobal + data.timbreFiscal
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -174,44 +204,72 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
 
         {/* Tableau des lignes — vertical lines extend through all rows */}
         <View style={styles.table}>
-          <View style={styles.rowHeader}>
-            <Text style={[styles.cell, styles.colSku]}>Référence</Text>
-            <Text style={[styles.cell, styles.colDesignation]}>Désignation</Text>
-            <Text style={[styles.cell, styles.colQty, styles.num]}>Qté</Text>
-            <Text style={[styles.cell, styles.colPu, styles.num]}>P.U. HT</Text>
-            <Text style={[styles.cell, styles.colRemise, styles.num]}>Remise</Text>
-            <Text style={[styles.cell, styles.colPrixHT, styles.num]}>Prix HT</Text>
-            <Text style={[styles.cell, styles.colTva, styles.num]}>TVA %</Text>
-            <Text style={[styles.cell, styles.colMtTva, styles.num]}>Mt TVA</Text>
-            <Text style={[styles.cellLast, styles.colTtc, styles.num]}>TTC</Text>
-          </View>
+          {showVat ? (
+            <View style={styles.rowHeader}>
+              <Text style={[styles.cell, styles.colSku]}>Référence</Text>
+              <Text style={[styles.cell, styles.colDesignation]}>Désignation</Text>
+              <Text style={[styles.cell, styles.colQty, styles.num]}>Qté</Text>
+              <Text style={[styles.cell, styles.colPu, styles.num]}>P.U. HT</Text>
+              <Text style={[styles.cell, styles.colRemise, styles.num]}>Remise</Text>
+              <Text style={[styles.cell, styles.colPrixHT, styles.num]}>Prix HT</Text>
+              <Text style={[styles.cell, styles.colTva, styles.num]}>TVA %</Text>
+              <Text style={[styles.cell, styles.colMtTva, styles.num]}>Mt TVA</Text>
+              <Text style={[styles.cellLast, styles.colTtc, styles.num]}>TTC</Text>
+            </View>
+          ) : (
+            <View style={styles.rowHeader}>
+              <Text style={[styles.cell, styles.colSkuN]}>Référence</Text>
+              <Text style={[styles.cell, styles.colDesignationN]}>Désignation</Text>
+              <Text style={[styles.cell, styles.colQtyN, styles.num]}>Qté</Text>
+              <Text style={[styles.cell, styles.colPuN, styles.num]}>P.U. HT</Text>
+              <Text style={[styles.cell, styles.colRemiseN, styles.num]}>Remise</Text>
+              <Text style={[styles.cellLast, styles.colPrixHTN, styles.num]}>Montant HT</Text>
+            </View>
+          )}
           {data.lines.map((l, i) => (
             <View key={i} style={styles.row}>
-              <Text style={[styles.cell, styles.colSku]}>{l.sku}</Text>
-              <Text style={[styles.cell, styles.colDesignation]}>{l.designation}</Text>
-              <Text style={[styles.cell, styles.colQty, styles.num]}>{fmt(l.quantity)}</Text>
-              <Text style={[styles.cell, styles.colPu, styles.num]}>{fmt(l.unitPriceHT)}</Text>
-              <Text style={[styles.cell, styles.colRemise, styles.num]}>{l.discountLabel || '-'}</Text>
-              <Text style={[styles.cell, styles.colPrixHT, styles.num]}>{fmt(l.lineHT)}</Text>
-              <Text style={[styles.cell, styles.colTva, styles.num]}>{fmt(l.taxRate)}</Text>
-              <Text style={[styles.cell, styles.colMtTva, styles.num]}>{fmt(l.lineTVA)}</Text>
-              <Text style={[styles.cellLast, styles.colTtc, styles.num]}>{fmt(l.lineTTC)}</Text>
+              <Text style={[styles.cell, showVat ? styles.colSku : styles.colSkuN]}>{l.sku}</Text>
+              <Text style={[styles.cell, showVat ? styles.colDesignation : styles.colDesignationN]}>{l.designation}</Text>
+              <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.num]}>{fmt(l.quantity)}</Text>
+              <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.num]}>{fmt(l.unitPriceHT)}</Text>
+              <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.num]}>{l.discountLabel || '-'}</Text>
+              <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.num]}>{fmt(l.lineHT)}</Text>
+              {showVat ? (
+                <>
+                  <Text style={[styles.cell, styles.colTva, styles.num]}>{fmt(l.taxRate)}</Text>
+                  <Text style={[styles.cell, styles.colMtTva, styles.num]}>{fmt(l.lineTVA)}</Text>
+                  <Text style={[styles.cellLast, styles.colTtc, styles.num]}>{fmt(l.lineTTC)}</Text>
+                </>
+              ) : null}
             </View>
           ))}
           {Array.from({ length: emptyRows }).map((_, i) => (
             <View key={`empty-${i}`} style={styles.row}>
-              <Text style={[styles.cell, styles.colSku]}>&#8203;</Text>
-              <Text style={[styles.cell, styles.colDesignation]}>&#8203;</Text>
-              <Text style={[styles.cell, styles.colQty, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cell, styles.colPu, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cell, styles.colRemise, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cell, styles.colPrixHT, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cell, styles.colTva, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cell, styles.colMtTva, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cellLast, styles.colTtc, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colSku : styles.colSkuN]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colDesignation : styles.colDesignationN]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.num]}>&#8203;</Text>
+              <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.num]}>&#8203;</Text>
+              {showVat ? (
+                <>
+                  <Text style={[styles.cell, styles.colTva, styles.num]}>&#8203;</Text>
+                  <Text style={[styles.cell, styles.colMtTva, styles.num]}>&#8203;</Text>
+                  <Text style={[styles.cellLast, styles.colTtc, styles.num]}>&#8203;</Text>
+                </>
+              ) : null}
             </View>
           ))}
         </View>
+
+        {/* Mention entreprise non assujettie à la TVA (facture sans TVA) */}
+        {data.nonAssujettiTva ? (
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeText}>
+              Entreprise non assujettie à la TVA conformément à l'article 18 du Code de la TVA
+            </Text>
+          </View>
+        ) : null}
 
         {/* Bottom row: Signature (left) + Totals (right) — absolutely positioned */}
         <View style={styles.bottomRow}>
@@ -238,21 +296,28 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text>Total HT après remise</Text>
               <Text>{fmt(data.totalHTBeforeGlobal - data.discountGlobal)} DT</Text>
             </View>
-            {data.vatBreakdown.map((b) => (
-              <View key={b.rate} style={styles.recapRow}>
-                <Text>TVA {fmt(b.rate)}%</Text>
-                <Text>{fmt(b.tva)} DT</Text>
-              </View>
-            ))}
+            {showVat
+              ? data.vatBreakdown.map((b) => (
+                  <View key={b.rate} style={styles.recapRow}>
+                    <Text>TVA {fmt(b.rate)}%</Text>
+                    <Text>{fmt(b.tva)} DT</Text>
+                  </View>
+                ))
+              : null}
             {data.timbreFiscal > 0 ? (
               <View style={styles.recapRow}>
                 <Text>Timbre fiscal</Text>
                 <Text>{fmt(data.timbreFiscal)} DT</Text>
               </View>
             ) : null}
+            {data.sommeEnLettres ? (
+              <View style={styles.sommeBox}>
+                <Text style={styles.sommeText}>{data.sommeEnLettres}</Text>
+              </View>
+            ) : null}
             <View style={styles.recapRowTotal}>
-              <Text>Total TTC — Net à payer</Text>
-              <Text>{fmt(data.totalTTC)} DT</Text>
+              <Text>{showVat ? 'Total TTC — Net à payer' : 'Net à payer'}</Text>
+              <Text>{fmt(netAPayer)} DT</Text>
             </View>
           </View>
         </View>
@@ -291,7 +356,10 @@ function discountLabel(line: { discountType: string | null; discountValue: Prism
   return `${fmt(line.discountValue)} DT`
 }
 
-export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
+export async function generateInvoicePdf(
+  invoiceId: string,
+  options?: { withVat?: boolean; sommeEnLettres?: string },
+): Promise<Buffer> {
   const invoice = await db.invoice.findUnique({
     where: { id: invoiceId },
     include: {
@@ -332,6 +400,9 @@ export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
     totalTVA: Number(invoice.totalTVA),
     timbreFiscal: Number(invoice.timbreFiscal),
     totalTTC: Number(invoice.totalTTC),
+    showVat: options?.withVat !== false,
+    nonAssujettiTva: options?.withVat === false,
+    sommeEnLettres: options?.sommeEnLettres,
     store,
   }
   return renderToBuffer(<PdfDocumentView data={data} />)

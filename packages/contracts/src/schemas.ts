@@ -165,6 +165,16 @@ export const purchaseOrderSchema = z.object({
   ).min(1),
 })
 
+export const purchaseInvoiceSchema = z.object({
+  supplierId: z.string().min(1),
+  issueDate: z.string().datetime().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+  globalDiscountType: z.enum(['PERCENT', 'AMOUNT']).nullable().optional(),
+  globalDiscountValue: z.coerce.number().min(0).default(0),
+  notes: z.string().optional().nullable(),
+  lines: z.array(documentLineSchema).min(1, 'Au moins une ligne est requise'),
+})
+
 export const onlineOrderCreateSchema = z.object({
   customerId: z.string().min(1),
   shippingFullName: z.string().min(1),
@@ -226,6 +236,7 @@ export type InvoiceInput = z.infer<typeof invoiceSchema>
 export type CreditNoteInput = z.infer<typeof creditNoteSchema>
 export type PaymentInput = z.infer<typeof paymentSchema>
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>
+export type PurchaseInvoiceInput = z.infer<typeof purchaseInvoiceSchema>
 export type OnlineOrderCreateInput = z.infer<typeof onlineOrderCreateSchema>
 export type PosSaleInput = z.infer<typeof posSaleSchema>
 export type StoreSettingsInput = z.infer<typeof storeSettingsSchema>
