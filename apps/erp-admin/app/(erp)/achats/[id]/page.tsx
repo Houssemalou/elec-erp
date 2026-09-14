@@ -82,7 +82,7 @@ export default async function PurchaseInvoiceDetailPage({ params }: { params: Pr
               <tbody>
                 {invoice.items.map((i) => (
                   <TR key={i.id}>
-                    <TD className="font-mono text-xs text-white/50">{i.sku}</TD>
+                    <TD className="font-mono text-xs break-all text-white/50">{i.sku}</TD>
                     <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>

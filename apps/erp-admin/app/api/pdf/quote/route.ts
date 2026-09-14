@@ -6,9 +6,10 @@ export const runtime = 'nodejs'
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
+  const vat = searchParams.get('vat')
   if (!id) return new Response('id manquant', { status: 400 })
   try {
-    const pdf = await generateQuotePdf(id)
+    const pdf = await generateQuotePdf(id, { withVat: vat !== '0' })
     return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',

@@ -26,7 +26,11 @@ export async function buildInvoiceItems(client: Prisma.TransactionClient, lines:
 }
 
 export async function createInvoice(input: {
-  customerId: string
+  customerId?: string | null
+  customerName?: string | null
+  customerMatricule?: string | null
+  customerAddress?: string | null
+  customerCity?: string | null
   createdById: string
   quoteId?: string | null
   issueDate?: string | null
@@ -49,7 +53,11 @@ export async function createInvoice(input: {
     return tx.invoice.create({
       data: {
         number,
-        customerId: input.customerId,
+        customerId: input.customerId ?? null,
+        customerName: input.customerName ?? null,
+        customerMatricule: input.customerMatricule ?? null,
+        customerAddress: input.customerAddress ?? null,
+        customerCity: input.customerCity ?? null,
         quoteId: input.quoteId ?? null,
         createdById: input.createdById,
         status: InvoiceStatus.DRAFT,
@@ -144,7 +152,7 @@ export async function convertQuoteToInvoice(quoteId: string, createdById: string
   return db.$transaction(async (tx) => {
     const quote = await tx.quote.findUnique({
       where: { id: quoteId },
-      include: { items: { include: { taxRate: true } } },
+      include: { items: { include: { taxRate: true } }, customer: true },
     })
     if (!quote) throw new Error('Devis introuvable')
     if (quote.invoiceId) throw new Error('Ce devis a déjà été converti en facture')
@@ -170,7 +178,11 @@ export async function convertQuoteToInvoice(quoteId: string, createdById: string
     const invoice = await tx.invoice.create({
       data: {
         number,
-        customerId: quote.customerId,
+        customerId: quote.customerId ?? null,
+        customerName: quote.customerName ?? null,
+        customerMatricule: quote.customer?.matriculeFiscal ?? null,
+        customerAddress: quote.customer?.address ?? null,
+        customerCity: quote.customer?.city ?? null,
         quoteId: quote.id,
         createdById,
         status: InvoiceStatus.DRAFT,

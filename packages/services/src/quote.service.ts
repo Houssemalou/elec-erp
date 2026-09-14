@@ -63,7 +63,9 @@ function globalDiscountFromInput(input: { globalDiscountType?: 'PERCENT' | 'AMOU
 }
 
 export async function createQuote(input: {
-  customerId: string
+  customerId?: string | null
+  customerName?: string | null
+  nonAssujettiTva?: boolean
   createdById: string
   validUntil?: string | null
   globalDiscountType?: 'PERCENT' | 'AMOUNT' | null
@@ -84,7 +86,9 @@ export async function createQuote(input: {
     return tx.quote.create({
       data: {
         number,
-        customerId: input.customerId,
+        customerId: input.customerId ?? null,
+        customerName: input.customerName ?? null,
+        nonAssujettiTva: input.nonAssujettiTva ?? false,
         createdById: input.createdById,
         status: QuoteStatus.DRAFT,
         validUntil: input.validUntil ? new Date(input.validUntil) : null,
@@ -121,7 +125,9 @@ export async function createQuote(input: {
 export async function updateQuote(
   id: string,
   input: {
-    customerId: string
+    customerId?: string | null
+    customerName?: string | null
+    nonAssujettiTva?: boolean
     validUntil?: string | null
     globalDiscountType?: 'PERCENT' | 'AMOUNT' | null
     globalDiscountValue?: number
@@ -146,7 +152,9 @@ export async function updateQuote(
     return tx.quote.update({
       where: { id },
       data: {
-        customerId: input.customerId,
+        customerId: input.customerId ?? null,
+        customerName: input.customerName ?? null,
+        nonAssujettiTva: input.nonAssujettiTva ?? false,
         validUntil: input.validUntil ? new Date(input.validUntil) : null,
         totalHT: toDecimalString(totals.totalHT),
         totalTVA: toDecimalString(totals.totalTVA),
@@ -205,6 +213,7 @@ export async function listQuotes(options?: { status?: QuoteStatus; search?: stri
   if (options?.search) {
     where.OR = [
       { number: { contains: options.search } },
+      { customerName: { contains: options.search } },
       { customer: { OR: [{ firstName: { contains: options.search } }, { lastName: { contains: options.search } }, { companyName: { contains: options.search } }] } },
     ]
   }

@@ -25,7 +25,7 @@ export default async function NewCreditNotePage({
   ])
 
   const invoiceLabel = (i: (typeof invoices)[number]) =>
-    `${i.number} — ${i.customer.companyName || [i.customer.firstName, i.customer.lastName].filter(Boolean).join(' ') || 'Client'}`
+    `${i.number} — ${i.customerName || (i.customer ? i.customer.companyName || [i.customer.firstName, i.customer.lastName].filter(Boolean).join(' ') : null) || 'Client'}`
 
   return (
     <div className="mx-auto max-w-7xl">

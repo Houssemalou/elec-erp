@@ -17,6 +17,9 @@ const fmt = (n: number | string | Prisma.Decimal) => {
   return stripped.replace('.', ',')
 }
 
+/** Permet au moteur PDF de couper une référence trop longue sur plusieurs lignes. */
+const breakable = (s: string) => (s.length > 9 ? s.split('').join('\u200B') : s)
+
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#ffffff',
@@ -56,24 +59,29 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     alignItems: 'center',
   },
-  cell: { paddingHorizontal: 3, borderRightWidth: 0.5, borderRightColor: '#cccccc' },
+  cell: {
+    paddingHorizontal: 3,
+    borderRightWidth: 1,
+    borderRightColor: '#000000',
+  },
   cellLast: { paddingHorizontal: 3 },
   num: { textAlign: 'right' },
   colSku: { width: '9%' },
-  colDesignation: { width: '30%' },
+  colDesignation: { width: '28%' },
   colQty: { width: '7%' },
   colPu: { width: '10%' },
-  colRemise: { width: '8%' },
+  colRemise: { width: '9%' },
   colPrixHT: { width: '11%' },
-  colTva: { width: '8%' },
+  colTva: { width: '9%' },
   colMtTva: { width: '9%' },
   colTtc: { width: '8%' },
   colSkuN: { width: '12%' },
-  colDesignationN: { width: '38%' },
-  colQtyN: { width: '9%' },
-  colPuN: { width: '13%' },
+  colDesignationN: { width: '32%' },
+  colQtyN: { width: '8%' },
+  colPuN: { width: '14%' },
   colRemiseN: { width: '10%' },
-  colPrixHTN: { width: '18%' },
+  colPrixHTN: { width: '24%' },
+  cellCenter: { textAlign: 'center' },
   noticeBox: {
     borderWidth: 1,
     borderColor: '#000000',
@@ -165,9 +173,10 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
   const dateStr = data.date.toLocaleDateString('fr-FR')
   const emptyRows = Math.max(0, 12 - data.lines.length)
   const showVat = data.showVat !== false
-  const netAPayer = showVat
-    ? data.totalTTC
-    : data.totalHTBeforeGlobal - data.discountGlobal + data.timbreFiscal
+  const netAPayer = data.totalTTC
+  const grossTTC = data.lines.reduce((s, l) => s + l.lineTTC, 0)
+  const netTTCExclTimbre = data.totalHTBeforeGlobal - data.discountGlobal + data.totalTVA
+  const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -206,39 +215,43 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
         <View style={styles.table}>
           {showVat ? (
             <View style={styles.rowHeader}>
-              <Text style={[styles.cell, styles.colSku]}>Référence</Text>
-              <Text style={[styles.cell, styles.colDesignation]}>Désignation</Text>
-              <Text style={[styles.cell, styles.colQty, styles.num]}>Qté</Text>
-              <Text style={[styles.cell, styles.colPu, styles.num]}>P.U. HT</Text>
-              <Text style={[styles.cell, styles.colRemise, styles.num]}>Remise</Text>
-              <Text style={[styles.cell, styles.colPrixHT, styles.num]}>Prix HT</Text>
-              <Text style={[styles.cell, styles.colTva, styles.num]}>TVA %</Text>
-              <Text style={[styles.cell, styles.colMtTva, styles.num]}>Mt TVA</Text>
-              <Text style={[styles.cellLast, styles.colTtc, styles.num]}>TTC</Text>
+              <Text style={[styles.cell, styles.colSku, styles.cellCenter]}>Référence</Text>
+              <Text style={[styles.cell, styles.colDesignation, styles.cellCenter]}>Désignation</Text>
+              <Text style={[styles.cell, styles.colQty, styles.cellCenter]}>Qté</Text>
+              <Text style={[styles.cell, styles.colPu, styles.cellCenter]}>P.U. HT</Text>
+              <Text style={[styles.cell, styles.colRemise, styles.cellCenter]}>Remise</Text>
+              <Text style={[styles.cell, styles.colPrixHT, styles.cellCenter]}>Prix HT</Text>
+              <Text style={[styles.cell, styles.colTva, styles.cellCenter]}>TVA %</Text>
+              <Text style={[styles.cell, styles.colMtTva, styles.cellCenter]}>Mt TVA</Text>
+              <Text style={[styles.cellLast, styles.colTtc, styles.cellCenter]}>TTC</Text>
             </View>
           ) : (
             <View style={styles.rowHeader}>
-              <Text style={[styles.cell, styles.colSkuN]}>Référence</Text>
-              <Text style={[styles.cell, styles.colDesignationN]}>Désignation</Text>
-              <Text style={[styles.cell, styles.colQtyN, styles.num]}>Qté</Text>
-              <Text style={[styles.cell, styles.colPuN, styles.num]}>P.U. HT</Text>
-              <Text style={[styles.cell, styles.colRemiseN, styles.num]}>Remise</Text>
-              <Text style={[styles.cellLast, styles.colPrixHTN, styles.num]}>Montant HT</Text>
+              <Text style={[styles.cell, styles.colSkuN, styles.cellCenter]}>Référence</Text>
+              <Text style={[styles.cell, styles.colDesignationN, styles.cellCenter]}>Désignation</Text>
+              <Text style={[styles.cell, styles.colQtyN, styles.cellCenter]}>Qté</Text>
+              <Text style={[styles.cell, styles.colPuN, styles.cellCenter]}>P.U. HT</Text>
+              <Text style={[styles.cell, styles.colRemiseN, styles.cellCenter]}>Remise</Text>
+              <Text style={[styles.cellLast, styles.colPrixHTN, styles.cellCenter]}>Montant</Text>
             </View>
           )}
           {data.lines.map((l, i) => (
             <View key={i} style={styles.row}>
-              <Text style={[styles.cell, showVat ? styles.colSku : styles.colSkuN]}>{l.sku}</Text>
+              <Text style={[styles.cell, showVat ? styles.colSku : styles.colSkuN]}>{breakable(l.sku)}</Text>
               <Text style={[styles.cell, showVat ? styles.colDesignation : styles.colDesignationN]}>{l.designation}</Text>
-              <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.num]}>{fmt(l.quantity)}</Text>
-              <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.num]}>{fmt(l.unitPriceHT)}</Text>
-              <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.num]}>{l.discountLabel || '-'}</Text>
-              <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.num]}>{fmt(l.lineHT)}</Text>
+              <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.cellCenter]}>{fmt(l.quantity)}</Text>
+              <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.cellCenter]}>
+                {fmt(showVat ? l.unitPriceHT : l.unitPriceHT * (1 + l.taxRate / 100))}
+              </Text>
+              <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.cellCenter]}>{l.discountLabel || '-'}</Text>
+              <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.cellCenter]}>
+                {fmt(showVat ? l.lineHT : l.lineTTC)}
+              </Text>
               {showVat ? (
                 <>
-                  <Text style={[styles.cell, styles.colTva, styles.num]}>{fmt(l.taxRate)}</Text>
-                  <Text style={[styles.cell, styles.colMtTva, styles.num]}>{fmt(l.lineTVA)}</Text>
-                  <Text style={[styles.cellLast, styles.colTtc, styles.num]}>{fmt(l.lineTTC)}</Text>
+                  <Text style={[styles.cell, styles.colTva, styles.cellCenter]}>{fmt(l.taxRate)}</Text>
+                  <Text style={[styles.cell, styles.colMtTva, styles.cellCenter]}>{fmt(l.lineTVA)}</Text>
+                  <Text style={[styles.cellLast, styles.colTtc, styles.cellCenter]}>{fmt(l.lineTTC)}</Text>
                 </>
               ) : null}
             </View>
@@ -247,15 +260,15 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
             <View key={`empty-${i}`} style={styles.row}>
               <Text style={[styles.cell, showVat ? styles.colSku : styles.colSkuN]}>&#8203;</Text>
               <Text style={[styles.cell, showVat ? styles.colDesignation : styles.colDesignationN]}>&#8203;</Text>
-              <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.num]}>&#8203;</Text>
-              <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.num]}>&#8203;</Text>
-              <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.num]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.cellCenter]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.cellCenter]}>&#8203;</Text>
+              <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.cellCenter]}>&#8203;</Text>
+              <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.cellCenter]}>&#8203;</Text>
               {showVat ? (
                 <>
-                  <Text style={[styles.cell, styles.colTva, styles.num]}>&#8203;</Text>
-                  <Text style={[styles.cell, styles.colMtTva, styles.num]}>&#8203;</Text>
-                  <Text style={[styles.cellLast, styles.colTtc, styles.num]}>&#8203;</Text>
+                  <Text style={[styles.cell, styles.colTva, styles.cellCenter]}>&#8203;</Text>
+                  <Text style={[styles.cell, styles.colMtTva, styles.cellCenter]}>&#8203;</Text>
+                  <Text style={[styles.cellLast, styles.colTtc, styles.cellCenter]}>&#8203;</Text>
                 </>
               ) : null}
             </View>
@@ -296,14 +309,47 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text>Total HT après remise</Text>
               <Text>{fmt(data.totalHTBeforeGlobal - data.discountGlobal)} DT</Text>
             </View>
-            {showVat
-              ? data.vatBreakdown.map((b) => (
-                  <View key={b.rate} style={styles.recapRow}>
-                    <Text>TVA {fmt(b.rate)}%</Text>
-                    <Text>{fmt(b.tva)} DT</Text>
-                  </View>
-                ))
-              : null}
+            {showVat ? (
+            <>
+              <View style={styles.recapRow}>
+                <Text>Total HT</Text>
+                <Text>{fmt(data.totalHTBeforeGlobal)} DT</Text>
+              </View>
+              {data.discountGlobal > 0 ? (
+                <View style={styles.recapRow}>
+                  <Text>Remise globale</Text>
+                  <Text>-{fmt(data.discountGlobal)} DT</Text>
+                </View>
+              ) : null}
+              <View style={styles.recapRow}>
+                <Text>Total HT après remise</Text>
+                <Text>{fmt(data.totalHTBeforeGlobal - data.discountGlobal)} DT</Text>
+              </View>
+              {data.vatBreakdown.map((b) => (
+                <View key={b.rate} style={styles.recapRow}>
+                  <Text>TVA {fmt(b.rate)}%</Text>
+                  <Text>{fmt(b.tva)} DT</Text>
+                </View>
+              ))}
+            </>
+          ) : (
+            <>
+              <View style={styles.recapRow}>
+                <Text>Total</Text>
+                <Text>{fmt(grossTTC)} DT</Text>
+              </View>
+              {discountTTC > 0.001 ? (
+                <View style={styles.recapRow}>
+                  <Text>Remise globale</Text>
+                  <Text>-{fmt(discountTTC)} DT</Text>
+                </View>
+              ) : null}
+              <View style={styles.recapRow}>
+                <Text>Total après remise</Text>
+                <Text>{fmt(netTTCExclTimbre)} DT</Text>
+              </View>
+            </>
+          )}
             {data.timbreFiscal > 0 ? (
               <View style={styles.recapRow}>
                 <Text>Timbre fiscal</Text>
@@ -377,11 +423,17 @@ export async function generateInvoicePdf(
     date: invoice.issueDate,
     secondaryDate: invoice.dueDate ? { label: 'Échéance', value: invoice.dueDate.toLocaleDateString('fr-FR') } : undefined,
     customer: {
-      name: invoice.customer.companyName || [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ') || 'Client',
-      matriculeFiscal: invoice.customer.matriculeFiscal,
-      cin: invoice.customer.cin,
-      address: invoice.customer.address,
-      city: invoice.customer.city,
+      name:
+        invoice.customerName ||
+        (invoice.customer
+          ? invoice.customer.companyName ||
+            [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ')
+          : null) ||
+        'Client',
+      matriculeFiscal: invoice.customerMatricule ?? invoice.customer?.matriculeFiscal ?? null,
+      cin: invoice.customer?.cin ?? null,
+      address: invoice.customerAddress ?? invoice.customer?.address ?? null,
+      city: invoice.customerCity ?? invoice.customer?.city ?? null,
     },
     lines: invoice.items.map((i) => ({
       sku: i.sku,
@@ -408,7 +460,7 @@ export async function generateInvoicePdf(
   return renderToBuffer(<PdfDocumentView data={data} />)
 }
 
-export async function generateQuotePdf(quoteId: string): Promise<Buffer> {
+export async function generateQuotePdf(quoteId: string, options?: { withVat?: boolean }): Promise<Buffer> {
   const quote = await db.quote.findUnique({
     where: { id: quoteId },
     include: { customer: true, items: { include: { taxRate: true } } },
@@ -416,6 +468,14 @@ export async function generateQuotePdf(quoteId: string): Promise<Buffer> {
   if (!quote) throw new Error('Devis introuvable')
 
   const store = await loadStore()
+  const customerName =
+    quote.customerName ||
+    (quote.customer
+      ? quote.customer.companyName ||
+        [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ') ||
+        'Client'
+      : 'Client')
+  const showVat = options?.withVat !== undefined ? options.withVat : !quote.nonAssujettiTva
   const data: PdfDocumentData = {
     type: 'quote',
     title: 'DEVIS',
@@ -423,11 +483,11 @@ export async function generateQuotePdf(quoteId: string): Promise<Buffer> {
     date: quote.createdAt,
     secondaryDate: quote.validUntil ? { label: 'Valable jusqu\'au', value: quote.validUntil.toLocaleDateString('fr-FR') } : undefined,
     customer: {
-      name: quote.customer.companyName || [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ') || 'Client',
-      matriculeFiscal: quote.customer.matriculeFiscal,
-      cin: quote.customer.cin,
-      address: quote.customer.address,
-      city: quote.customer.city,
+      name: customerName,
+      matriculeFiscal: quote.customer?.matriculeFiscal ?? null,
+      cin: quote.customer?.cin ?? null,
+      address: quote.customer?.address ?? null,
+      city: quote.customer?.city ?? null,
     },
     lines: quote.items.map((i) => ({
       sku: i.sku,
@@ -446,6 +506,8 @@ export async function generateQuotePdf(quoteId: string): Promise<Buffer> {
     totalTVA: Number(quote.totalTVA),
     timbreFiscal: 0,
     totalTTC: Number(quote.totalTTC),
+    showVat,
+    nonAssujettiTva: !showVat,
     store,
   }
   return renderToBuffer(<PdfDocumentView data={data} />)
@@ -466,11 +528,16 @@ export async function generateCreditNotePdf(creditNoteId: string): Promise<Buffe
     date: note.createdAt,
     secondaryDate: note.invoice ? { label: 'Facture d\'origine', value: note.invoice.number } : undefined,
     customer: {
-      name: note.customer.companyName || [note.customer.firstName, note.customer.lastName].filter(Boolean).join(' ') || 'Client',
-      matriculeFiscal: note.customer.matriculeFiscal,
-      cin: note.customer.cin,
-      address: note.customer.address,
-      city: note.customer.city,
+      name:
+        note.customerName ||
+        (note.customer
+          ? note.customer.companyName || [note.customer.firstName, note.customer.lastName].filter(Boolean).join(' ')
+          : null) ||
+        'Client',
+      matriculeFiscal: note.customerMatricule ?? note.customer?.matriculeFiscal ?? null,
+      cin: note.customer?.cin ?? null,
+      address: note.customerAddress ?? note.customer?.address ?? null,
+      city: note.customerCity ?? note.customer?.city ?? null,
     },
     lines: note.items.map((i) => ({
       sku: i.sku,

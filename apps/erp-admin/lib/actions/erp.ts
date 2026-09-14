@@ -122,6 +122,21 @@ function parseLines(fd: FormData): Array<{
   }
 }
 
+async function nextProductSku(preRef: string) {
+  const products = await db.product.findMany({
+    where: { sku: { startsWith: preRef } },
+    select: { sku: true },
+  })
+  let max = 0
+  for (const p of products) {
+    const suffix = p.sku.slice(preRef.length)
+    if (/^\d+$/.test(suffix)) max = Math.max(max, parseInt(suffix, 10))
+  }
+  const next = max + 1
+  if (next > 999) throw new Error('Limite de 999 références atteinte pour cette pré-référence')
+  return preRef + String(next).padStart(3, '0')
+}
+
 /** Retourne l'utilisateur courant si autorisé, sinon null. */
 function clean(users: Role[] = STAFF_ROLES) {
   return requireRole(users).then((r) => (r.allowed && r.session?.user ? r.session.user : null))
@@ -137,6 +152,8 @@ export async function createCategory(fd: FormData): Promise<ActionResult> {
   const name = str(fd, 'name')
   if (!name) return { success: false, error: 'Le nom est obligatoire' }
   const slug = str(fd, 'slug') || slugify(name)
+  const preRef = (str(fd, 'preRef') || '').trim() || null
+  if (preRef && preRef.length > 5) return { success: false, error: 'La pré-référence ne peut pas dépasser 5 caractères' }
 
   const existing = await db.category.findUnique({ where: { slug } })
   if (existing) return { success: false, error: `Une catégorie existe déjà avec le slug « ${slug} »` }
@@ -149,6 +166,7 @@ export async function createCategory(fd: FormData): Promise<ActionResult> {
       parentId: str(fd, 'parentId') || null,
       taxRateId: str(fd, 'taxRateId') || null,
       markupPercent: num(fd, 'markupPercent') || null,
+      preRef: preRef ?? undefined,
       active: check(fd, 'active'),
       sortOrder: Math.round(num(fd, 'sortOrder')),
     },
@@ -164,6 +182,8 @@ export async function updateCategory(id: string, fd: FormData): Promise<ActionRe
   const name = str(fd, 'name')
   if (!name) return { success: false, error: 'Le nom est obligatoire' }
   const slug = str(fd, 'slug') || slugify(name)
+  const preRef = (str(fd, 'preRef') || '').trim() || null
+  if (preRef && preRef.length > 5) return { success: false, error: 'La pré-référence ne peut pas dépasser 5 caractères' }
   const clash = await db.category.findFirst({ where: { slug, NOT: { id } } })
   if (clash) return { success: false, error: 'Une autre catégorie utilise déjà ce slug' }
 
@@ -176,6 +196,7 @@ export async function updateCategory(id: string, fd: FormData): Promise<ActionRe
       parentId: str(fd, 'parentId') || null,
       taxRateId: str(fd, 'taxRateId') || null,
       markupPercent: num(fd, 'markupPercent') || null,
+      preRef: preRef ?? undefined,
       active: check(fd, 'active'),
       sortOrder: Math.round(num(fd, 'sortOrder')),
     },
@@ -226,12 +247,19 @@ export async function createProduct(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
 
-  const sku = str(fd, 'sku')
   const name = str(fd, 'name')
-  if (!sku || !name) return { success: false, error: 'Référence et nom sont obligatoires' }
+  if (!name) return { success: false, error: 'Le nom est obligatoire' }
   if (num(fd, 'priceHT') <= 0) return { success: false, error: 'Le prix HT doit être positif' }
   const taxRateId = str(fd, 'taxRateId')
   if (!taxRateId) return { success: false, error: 'Un taux de TVA est obligatoire' }
+  const categoryId = str(fd, 'categoryId') || null
+
+  let sku = str(fd, 'sku')
+  if (categoryId) {
+    const category = await db.category.findUnique({ where: { id: categoryId }, select: { preRef: true } })
+    if (category?.preRef) sku = await nextProductSku(category.preRef)
+  }
+  if (!sku) return { success: false, error: 'La référence est obligatoire' }
 
   const slug = str(fd, 'slug') || slugify(`${name}-${sku}`)
   const images = parseImageList(fd)
@@ -249,7 +277,7 @@ export async function createProduct(fd: FormData): Promise<ActionResult> {
         costPrice: numOrNull(fd, 'costPrice'),
         unit: str(fd, 'unit') || 'unité',
         weightKg: numOrNull(fd, 'weightKg'),
-        categoryId: str(fd, 'categoryId') || null,
+        categoryId,
         taxRateId,
         isActive: check(fd, 'isActive'),
         isFeatured: check(fd, 'isFeatured'),
@@ -564,15 +592,17 @@ export async function deleteSupplier(id: string): Promise<ActionResult> {
 export async function createQuoteAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
-  const customerId = str(fd, 'customerId')
+  const customerId = str(fd, 'customerId') || null
+  const customerName = str(fd, 'customerName') || null
   const lines = parseLines(fd)
-  if (!customerId) return { success: false, error: 'Le client est obligatoire' }
   if (lines.length === 0) return { success: false, error: 'Ajoutez au moins une ligne' }
 
   try {
-    await applyCompanyName(customerId, fd)
+    if (customerId) await applyCompanyName(customerId, fd)
     const q = await createQuote({
       customerId,
+      customerName,
+      nonAssujettiTva: str(fd, 'nonAssujettiTva') === '1',
       createdById: user.id,
       validUntil: str(fd, 'validUntil') || null,
       globalDiscountType: (str(fd, 'globalDiscountType') || null) as 'PERCENT' | 'AMOUNT' | null,
@@ -591,13 +621,17 @@ export async function createQuoteAction(fd: FormData): Promise<ActionResult> {
 export async function updateQuoteAction(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
+  const customerId = str(fd, 'customerId') || null
+  const customerName = str(fd, 'customerName') || null
   const lines = parseLines(fd)
   if (lines.length === 0) return { success: false, error: 'Ajoutez au moins une ligne' }
 
   try {
-    await applyCompanyName(str(fd, 'customerId'), fd)
+    if (customerId) await applyCompanyName(customerId, fd)
     await updateQuote(id, {
-      customerId: str(fd, 'customerId'),
+      customerId,
+      customerName,
+      nonAssujettiTva: str(fd, 'nonAssujettiTva') === '1',
       validUntil: str(fd, 'validUntil') || null,
       globalDiscountType: (str(fd, 'globalDiscountType') || null) as 'PERCENT' | 'AMOUNT' | null,
       globalDiscountValue: num(fd, 'globalDiscountValue'),
@@ -641,15 +675,22 @@ export async function setQuoteStatusAction(id: string, status: string): Promise<
 export async function createInvoiceAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
-  const customerId = str(fd, 'customerId')
+  const customerId = str(fd, 'customerId') || null
+  const customerName = str(fd, 'customerName') || null
+  const customerMatricule = str(fd, 'customerMatricule') || null
+  const customerAddress = str(fd, 'customerAddress') || null
+  const customerCity = str(fd, 'customerCity') || null
   const lines = parseLines(fd)
-  if (!customerId) return { success: false, error: 'Le client est obligatoire' }
   if (lines.length === 0) return { success: false, error: 'Ajoutez au moins une ligne' }
 
   try {
-    await applyCompanyName(customerId, fd)
+    if (customerId) await applyCompanyName(customerId, fd)
     const inv = await createInvoice({
       customerId,
+      customerName,
+      customerMatricule,
+      customerAddress,
+      customerCity,
       createdById: user.id,
       issueDate: str(fd, 'issueDate') || null,
       dueDate: str(fd, 'dueDate') || null,

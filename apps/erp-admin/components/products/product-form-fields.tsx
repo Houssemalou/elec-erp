@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Label, Input, Select, Textarea } from '@/components/ui'
 
 export interface ProductFormFieldsProps {
@@ -22,7 +22,7 @@ export interface ProductFormFieldsProps {
     minStockAlert: number
     images: Array<{ url: string; isPrimary: boolean }>
   }
-  categories: Array<{ id: string; name: string; markupPercent?: number | null }>
+  categories: Array<{ id: string; name: string; markupPercent?: number | null; preRef?: string | null }>
   taxRates: Array<{ id: string; label: string; rate: number }>
 }
 
@@ -33,6 +33,10 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
   const costPriceRef = useRef<HTMLInputElement>(null)
   const categoryRef = useRef<HTMLSelectElement>(null)
   const userEditedRef = useRef(false)
+  const [selectedCategoryId, setSelectedCategoryId] = useState(product?.categoryId ?? '')
+
+  const selectedPreRef = categories.find((c) => c.id === selectedCategoryId)?.preRef ?? null
+  const autoSku = !!selectedPreRef && !product
 
   useEffect(() => {
     const priceEl = priceHTRef.current
@@ -78,7 +82,19 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label>Référence (SKU) *</Label>
-          <Input name="sku" required defaultValue={product?.sku} placeholder="Ex : EL-CAB-001" />
+          <Input
+            name="sku"
+            required={!autoSku}
+            readOnly={autoSku}
+            defaultValue={product?.sku}
+            placeholder={autoSku ? `${selectedPreRef}001` : 'Ex : EL-CAB-001'}
+            className={autoSku ? 'opacity-60' : ''}
+          />
+          {autoSku ? (
+            <p className="mt-1 text-xs text-white/40">
+              Référence auto-générée : {selectedPreRef}001, {selectedPreRef}002, … (saisie manuelle ignorée)
+            </p>
+          ) : null}
         </div>
         <div>
           <Label>Nom *</Label>
@@ -117,7 +133,13 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label>Catégorie</Label>
-          <select ref={categoryRef} name="categoryId" defaultValue={product?.categoryId ?? ''} className="h-11 w-full rounded-xl border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white focus:border-accent-400 focus:outline-none">
+          <select
+            ref={categoryRef}
+            name="categoryId"
+            defaultValue={product?.categoryId ?? ''}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+            className="h-11 w-full rounded-xl border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white focus:border-accent-400 focus:outline-none"
+          >
             <option value="">— Aucune —</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}{c.markupPercent ? ` (marge ${c.markupPercent}%)` : ''}</option>

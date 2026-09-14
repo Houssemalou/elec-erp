@@ -31,6 +31,7 @@ export default async function InvoicesPage({
   if (q) {
     where.OR = [
       { number: { contains: q, mode: 'insensitive' } },
+      { customerName: { contains: q, mode: 'insensitive' } },
       { customer: { OR: [{ firstName: { contains: q, mode: 'insensitive' } }, { lastName: { contains: q, mode: 'insensitive' } }, { companyName: { contains: q, mode: 'insensitive' } }] } },
     ]
   }
@@ -93,7 +94,12 @@ export default async function InvoicesPage({
           </THead>
           <tbody>
             {invoices.map((inv) => {
-              const name = inv.customer.companyName || [inv.customer.firstName, inv.customer.lastName].filter(Boolean).join(' ') || 'Client'
+              const name =
+                inv.customerName ||
+                (inv.customer
+                  ? inv.customer.companyName || [inv.customer.firstName, inv.customer.lastName].filter(Boolean).join(' ')
+                  : null) ||
+                'Client'
               return (
                 <TR key={inv.id}>
                   <TD className="font-mono text-xs font-medium text-white/70">{inv.number}</TD>

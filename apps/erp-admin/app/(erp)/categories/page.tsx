@@ -68,6 +68,7 @@ export default async function CategoriesPage({
             <TR>
               <TH>Nom</TH>
               <TH>Slug</TH>
+              <TH>Pré-ref</TH>
               <TH>Parent</TH>
               <TH>TVA par défaut</TH>
               <TH className="text-right">Produits</TH>
@@ -81,6 +82,7 @@ export default async function CategoriesPage({
               <TR key={c.id}>
                 <TD className="font-medium text-slate-900">{c.name}</TD>
                 <TD className="font-mono text-xs text-slate-500">{c.slug}</TD>
+                <TD className="font-mono text-xs text-slate-500">{c.preRef ?? '—'}</TD>
                 <TD>{c.parent?.name ?? '—'}</TD>
                 <TD>{c.taxRate ? <Badge tone="blue">{Number(c.taxRate.rate)}%</Badge> : '—'}</TD>
                 <TD className="text-right">{c._count.products}</TD>
@@ -100,7 +102,7 @@ export default async function CategoriesPage({
             ))}
             {categories.length === 0 ? (
               <TR>
-                <TD colSpan={8} className="py-12 text-center text-slate-400">Aucune catégorie</TD>
+                <TD colSpan={9} className="py-12 text-center text-slate-400">Aucune catégorie</TD>
               </TR>
             ) : null}
           </tbody>

@@ -30,7 +30,7 @@ export interface ProductOption {
 
 interface DocumentFormProps {
   partyLabel: string
-  partyOptions: Array<{ id: string; label: string; companyName?: string | null }>
+  partyOptions?: Array<{ id: string; label: string; companyName?: string | null }>
   products: ProductOption[]
   submitAction: (fd: FormData) => Promise<{ success: boolean; error?: string; id?: string }>
   successPath: string
@@ -50,6 +50,17 @@ interface DocumentFormProps {
   reason?: boolean
   /** Prix par défaut appliqué à l'ajout d'un produit : prix de vente (valeur par défaut) ou coût d'achat. */
   unitPriceFrom?: 'sale' | 'cost'
+  /** Affiche un champ texte libre à la place du menu déroulant client. */
+  partyFreeText?: boolean
+  defaultPartyFreeText?: string
+  /** Champs libres additionnels client (matricule fiscal, adresse, ville) sous le nom. */
+  partyDetailsFields?: boolean
+  defaultPartyMatricule?: string
+  defaultPartyAddress?: string
+  defaultPartyCity?: string
+  /** Affiche un bouton radio TVA (Avec / Sans) sur le devis. */
+  showVatOption?: boolean
+  defaultNonAssujettiTva?: boolean
 }
 
 let lineSeq = 0
@@ -57,7 +68,7 @@ const nextKey = () => `l${++lineSeq}`
 
 export function DocumentForm({
   partyLabel,
-  partyOptions,
+  partyOptions = [],
   products,
   submitAction,
   successPath,
@@ -76,6 +87,14 @@ export function DocumentForm({
   extraDate,
   reason = false,
   unitPriceFrom = 'sale',
+  partyFreeText = false,
+  defaultPartyFreeText = '',
+  partyDetailsFields = false,
+  defaultPartyMatricule = '',
+  defaultPartyAddress = '',
+  defaultPartyCity = '',
+  showVatOption = false,
+  defaultNonAssujettiTva = false,
 }: DocumentFormProps) {
   const router = useRouter()
   const [lines, setLines] = useState<DocLine[]>(defaultLines)
@@ -163,27 +182,74 @@ export function DocumentForm({
         submit(e.currentTarget)
       }}
     >
+      {showVatOption ? (
+        <div className="mb-4">
+          <Label>TVA</Label>
+          <div className="flex items-center gap-5">
+            <label className="flex items-center gap-2 text-sm text-white/70">
+              <input type="radio" name="nonAssujettiTva" value="0" defaultChecked={!defaultNonAssujettiTva} className="accent-accent-400" />
+              Avec TVA
+            </label>
+            <label className="flex items-center gap-2 text-sm text-white/70">
+              <input type="radio" name="nonAssujettiTva" value="1" defaultChecked={defaultNonAssujettiTva} className="accent-accent-400" />
+              Sans TVA
+            </label>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label>{partyLabel}</Label>
-          <Select
-            name={partyFieldName}
-            defaultValue={defaultPartyId}
-            required
-            onChange={(e) => {
-              const p = partyOptions.find((o) => o.id === e.target.value)
-              setCompanyName(p?.companyName ?? '')
-            }}
-          >
-            <option value="">Sélectionner un {partyLabel.toLowerCase()}…</option>
-            {partyOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </Select>
+          {partyFreeText ? (
+            <>
+              <div className="mb-3">
+                <Label>{partyLabel}</Label>
+                <Input
+                  name="customerName"
+                  defaultValue={defaultPartyFreeText}
+                  placeholder={`${partyLabel} (optionnel)`}
+                />
+              </div>
+              {partyDetailsFields ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Matricule fiscal (si client commercial)</Label>
+                    <Input name="customerMatricule" defaultValue={defaultPartyMatricule} placeholder="Optionnel" />
+                  </div>
+                  <div>
+                    <Label>Ville</Label>
+                    <Input name="customerCity" defaultValue={defaultPartyCity} placeholder="Optionnel" />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Adresse</Label>
+                    <Input name="customerAddress" defaultValue={defaultPartyAddress} placeholder="Optionnel" />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Label>{partyLabel}</Label>
+              <Select
+              name={partyFieldName}
+              defaultValue={defaultPartyId}
+              required
+              onChange={(e) => {
+                const p = partyOptions.find((o) => o.id === e.target.value)
+                setCompanyName(p?.companyName ?? '')
+              }}
+            >
+              <option value="">Sélectionner un {partyLabel.toLowerCase()}…</option>
+              {partyOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </Select>
+            </>
+          )}
         </div>
-        {partyCompanyName ? (
+        {!partyFreeText && partyCompanyName ? (
           <div>
             <Label>Nom de la société (client commercial)</Label>
             <Input

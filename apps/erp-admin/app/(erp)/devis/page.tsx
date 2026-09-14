@@ -31,6 +31,7 @@ export default async function QuotesPage({
   if (q) {
     where.OR = [
       { number: { contains: q, mode: 'insensitive' } },
+      { customerName: { contains: q, mode: 'insensitive' } },
       { customer: { OR: [{ firstName: { contains: q, mode: 'insensitive' } }, { lastName: { contains: q, mode: 'insensitive' } }, { companyName: { contains: q, mode: 'insensitive' } }] } },
     ]
   }
@@ -48,7 +49,11 @@ export default async function QuotesPage({
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const customerName = (q: (typeof quotes)[number]) =>
-    q.customer.companyName || [q.customer.firstName, q.customer.lastName].filter(Boolean).join(' ') || 'Client'
+    q.customerName ||
+    (q.customer
+      ? q.customer.companyName || [q.customer.firstName, q.customer.lastName].filter(Boolean).join(' ')
+      : null) ||
+    'Client'
 
   return (
     <div>

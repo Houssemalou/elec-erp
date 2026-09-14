@@ -38,8 +38,10 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
   if (!quote) notFound()
 
   const customerName =
-    quote.customer.companyName ||
-    [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ') ||
+    quote.customerName ||
+    (quote.customer
+      ? quote.customer.companyName || [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ')
+      : null) ||
     'Client'
 
   const isDraft = quote.status === 'DRAFT'
@@ -86,7 +88,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Client" subtitle={quote.customer.type === 'PROFESSIONNEL' ? 'Professionnel' : 'Particulier'} />
+            <CardHeader title="Client" subtitle={quote.customer?.type === 'PROFESSIONNEL' ? 'Professionnel' : 'Particulier'} />
             <div className="grid gap-4 p-5 text-sm sm:grid-cols-2">
               <div>
                 <p className="text-xs text-white/40">Nom</p>
@@ -94,19 +96,19 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
               </div>
               <div>
                 <p className="text-xs text-white/40">Matricule fiscal</p>
-                <p className="font-mono text-white/70">{quote.customer.matriculeFiscal ?? '—'}</p>
+                <p className="font-mono text-white/70">{quote.customer?.matriculeFiscal ?? '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40">CIN</p>
-                <p className="font-mono text-white/70">{quote.customer.cin ?? '—'}</p>
+                <p className="font-mono text-white/70">{quote.customer?.cin ?? '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40">Email</p>
-                <p>{quote.customer.email ?? '—'}</p>
+                <p>{quote.customer?.email ?? '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40">Téléphone</p>
-                <p>{quote.customer.phone ?? '—'}</p>
+                <p>{quote.customer?.phone ?? '—'}</p>
               </div>
             </div>
           </Card>
@@ -128,7 +130,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
               <tbody>
                 {quote.items.map((i) => (
                   <TR key={i.id}>
-                    <TD className="font-mono text-xs text-white/50">{i.sku}</TD>
+                    <TD className="font-mono text-xs break-all text-white/50">{i.sku}</TD>
                     <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>

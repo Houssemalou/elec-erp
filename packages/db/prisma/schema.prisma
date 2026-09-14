@@ -220,6 +220,7 @@ model Category {
   parentId      String?
   taxRateId     String?
   markupPercent Decimal? @db.Decimal(5, 2) // Marge (%) sur prix de revient → prix HT
+  preRef        String? // Pré-référence (max 5 car.) → références produits auto {preRef}001
   active        Boolean  @default(true)
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())
@@ -510,25 +511,27 @@ model Customer {
 // ---------------------------------------------------------------------------
 
 model Quote {
-  id            String      @id @default(cuid())
-  number        String      @unique // DEV-YYYY-######
-  customerId    String
-  createdById   String
-  status        QuoteStatus @default(DRAFT)
-  validUntil    DateTime?
-  totalHT       Decimal     @db.Decimal(12, 3) @default(0)
-  totalTVA      Decimal     @db.Decimal(12, 3) @default(0)
-  totalTTC      Decimal     @db.Decimal(12, 3) @default(0)
-  timbreFiscal  Decimal     @db.Decimal(12, 3) @default(0) // Toujours 0 sur un devis
-  discountGlobal Decimal   @db.Decimal(12, 3) @default(0)
-  vatBreakdown  Json        @default("{}")
-  notes         String?
-  conditions    String?
-  invoiceId     String?    @unique
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  number          String      @unique // DEV-YYYY-######
+  customerId      String?
+  createdById     String
+  status          QuoteStatus @default(DRAFT)
+  validUntil      DateTime?
+  totalHT         Decimal     @db.Decimal(12, 3) @default(0)
+  totalTVA        Decimal     @db.Decimal(12, 3) @default(0)
+  totalTTC        Decimal     @db.Decimal(12, 3) @default(0)
+  timbreFiscal    Decimal     @db.Decimal(12, 3) @default(0) // Toujours 0 sur un devis
+  discountGlobal Decimal     @db.Decimal(12, 3) @default(0)
+  vatBreakdown    Json        @default("{}")
+  customerName    String?
+  nonAssujettiTva Boolean     @default(false)
+  notes           String?
+  conditions      String?
+  invoiceId       String?    @unique
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  customer   Customer     @relation(fields: [customerId], references: [id])
+  customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
   createdBy  User         @relation("QuoteCreator", fields: [createdById], references: [id])
   items      QuoteItem[]
   invoice    Invoice?     @relation("QuoteToInvoice", fields: [invoiceId], references: [id])
@@ -567,28 +570,32 @@ model QuoteItem {
 // ---------------------------------------------------------------------------
 
 model Invoice {
-  id            String        @id @default(cuid())
-  number        String        @unique // FAC-YYYY-###### (verrouillée après validation)
-  customerId    String
-  quoteId       String?
-  createdById   String
-  source        InvoiceSource @default(MANUAL)
-  status        InvoiceStatus @default(DRAFT)
-  issueDate     DateTime      @default(now())
-  dueDate       DateTime?
-  totalHT       Decimal       @db.Decimal(12, 3) @default(0)
-  totalTVA      Decimal       @db.Decimal(12, 3) @default(0)
-  totalTTC      Decimal       @db.Decimal(12, 3) @default(0)
-  timbreFiscal  Decimal       @db.Decimal(12, 3) @default(1) // 1 DT sur chaque facture
-  discountGlobal Decimal     @db.Decimal(12, 3) @default(0)
-  paidAmount    Decimal       @db.Decimal(12, 3) @default(0)
-  vatBreakdown  Json          @default("{}")
-  notes         String?
-  validatedAt   DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id               String        @id @default(cuid())
+  number           String        @unique // FAC-YYYY-###### (verrouillée après validation)
+  customerId       String?
+  quoteId          String?
+  createdById      String
+  source           InvoiceSource @default(MANUAL)
+  status           InvoiceStatus @default(DRAFT)
+  issueDate        DateTime      @default(now())
+  dueDate          DateTime?
+  totalHT          Decimal       @db.Decimal(12, 3) @default(0)
+  totalTVA         Decimal       @db.Decimal(12, 3) @default(0)
+  totalTTC         Decimal       @db.Decimal(12, 3) @default(0)
+  timbreFiscal     Decimal       @db.Decimal(12, 3) @default(1) // 1 DT sur chaque facture
+  discountGlobal   Decimal       @db.Decimal(12, 3) @default(0)
+  paidAmount       Decimal       @db.Decimal(12, 3) @default(0)
+  vatBreakdown     Json          @default("{}")
+  customerName     String?
+  customerMatricule String?
+  customerAddress  String?
+  customerCity     String?
+  notes            String?
+  validatedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  customer    Customer      @relation(fields: [customerId], references: [id])
+  customer    Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
   quote       Quote?        @relation("QuoteToInvoice")
   createdBy   User          @relation("InvoiceCreator", fields: [createdById], references: [id])
   items       InvoiceItem[]
@@ -631,23 +638,27 @@ model InvoiceItem {
 // ---------------------------------------------------------------------------
 
 model CreditNote {
-  id            String            @id @default(cuid())
-  number        String            @unique // AV-YYYY-######
-  invoiceId     String
-  customerId    String
-  createdById   String
-  status        CreditNoteStatus  @default(DRAFT)
-  reason        String
-  totalHT       Decimal           @db.Decimal(12, 3) @default(0)
-  totalTVA      Decimal           @db.Decimal(12, 3) @default(0)
-  totalTTC      Decimal           @db.Decimal(12, 3) @default(0)
-  timbreFiscal  Decimal           @db.Decimal(12, 3) @default(0) // L'avoir ne porte pas de timbre
-  vatBreakdown  Json              @default("{}")
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id               String            @id @default(cuid())
+  number           String            @unique // AV-YYYY-######
+  invoiceId        String
+  customerId       String?
+  createdById      String
+  status           CreditNoteStatus  @default(DRAFT)
+  reason           String
+  totalHT          Decimal           @db.Decimal(12, 3) @default(0)
+  totalTVA         Decimal           @db.Decimal(12, 3) @default(0)
+  totalTTC         Decimal           @db.Decimal(12, 3) @default(0)
+  timbreFiscal     Decimal           @db.Decimal(12, 3) @default(0) // L'avoir ne porte pas de timbre
+  vatBreakdown     Json              @default("{}")
+  customerName     String?
+  customerMatricule String?
+  customerAddress  String?
+  customerCity     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   invoice   Invoice             @relation(fields: [invoiceId], references: [id])
-  customer  Customer            @relation(fields: [customerId], references: [id])
+  customer  Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
   createdBy User                @relation("CreditNoteCreator", fields: [createdById], references: [id])
   items     CreditNoteItem[]
 

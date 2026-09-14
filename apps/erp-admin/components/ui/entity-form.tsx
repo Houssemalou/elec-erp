@@ -40,7 +40,11 @@ export function EntityForm({
               setError(res.error ?? 'Erreur inconnue')
               return
             }
-            router.refresh()
+            if (cancelHref) {
+              router.replace(cancelHref)
+            } else {
+              router.refresh()
+            }
           } finally {
             stopActionLoader()
           }

@@ -65,40 +65,31 @@ const fmt = (n: number) => {
   return stripped.replace('.', ',')
 }
 
-function buildColumns(lines: PrintLine[], showVat: boolean): string {
-  const maxLen = lines.reduce((max, l) => Math.max(max, l.sku.length), 4)
-  const refW = Math.max(maxLen * 5.5 + 8, 36)
+function buildColumns(showVat: boolean): string {
   if (!showVat) {
-    return [`${refW}px`, 'minmax(100px, 1fr)', '38px', '52px', '42px', '64px'].join(' ')
+    return ['12%', '32%', '8%', '14%', '10%', '24%'].join(' ')
   }
-  return [
-    `${refW}px`,
-    'minmax(80px, 1fr)',
-    '38px',
-    '52px',
-    '42px',
-    '58px',
-    '38px',
-    '52px',
-    '56px',
-  ].join(' ')
+  return ['9%', '28%', '7%', '10%', '9%', '11%', '9%', '9%', '8%'].join(' ')
 }
 
 const C = 'px-1 py-1 min-w-0 flex items-start'
 const CN = `${C} justify-end text-right tabular-nums whitespace-nowrap`
+const CNY = `${C} items-center justify-center text-center tabular-nums whitespace-nowrap`
 const CT = `${C} text-left`
+const CH = `${C} items-center justify-center text-center`
 const H = 'bg-slate-50 text-[9px] font-semibold uppercase tracking-wide text-slate-600 border-b-2 border-slate-800'
-const BR = 'border-r border-slate-200'
-const BRH = 'border-r border-slate-300'
+const BR = 'border-r border-slate-800'
+const BRH = 'border-r border-slate-800'
 
 export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const dateStr = doc.date.toLocaleDateString('fr-FR')
   const showVat = doc.showVat !== false
-  const netAPayer = showVat
-    ? doc.totalTTC
-    : doc.totalHTAfterDiscount + doc.timbreFiscal
+  const netAPayer = doc.totalTTC
+  const grossTTC = doc.lines.reduce((s, l) => s + l.lineTTC, 0)
+  const netTTCExclTimbre = doc.totalHTAfterDiscount + doc.totalTVA
+  const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
   const fillCells = showVat ? 9 : 6
-  const gridCols = buildColumns(doc.lines, showVat)
+  const gridCols = buildColumns(showVat)
 
   return (
     <div className="print-sheet mx-auto flex h-[275mm] w-[210mm] flex-col overflow-hidden rounded-lg bg-white p-[10mm_12mm_0] shadow-lifted">
@@ -141,52 +132,52 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
         ) : null}
       </div>
 
-      {/* ── Grid — fills remaining space, vertical lines stop at its bottom border ── */}
+      {/* ── Grid — fills remaining space, vertical lines stop at its bottom edge ── */}
       <div
-        className="mt-2 grid min-h-0 flex-1 items-stretch border-y-2 border-slate-800 text-[10px]"
+        className="mt-2 grid min-h-0 flex-1 items-stretch border-t-2 border-slate-800 text-[10px]"
         style={{
           gridTemplateColumns: gridCols,
           gridTemplateRows: `auto repeat(${doc.lines.length}, auto) 1fr`,
         }}
       >
         {/* Header row */}
-        <div className={`${CT} ${BRH} ${H}`}>Ref</div>
-        <div className={`${CT} ${BRH} ${H}`}>Désignation</div>
-        <div className={`${CN} ${BRH} ${H}`}>Qté</div>
-        <div className={`${CN} ${BRH} ${H}`}>P.U. HT</div>
-        <div className={`${CN} ${BRH} ${H}`}>Remise</div>
-        <div className={`${CN} ${H}`}>{showVat ? 'Prix HT' : 'Montant HT'}</div>
+        <div className={`${CH} ${BRH} ${H}`}>Ref</div>
+        <div className={`${CH} ${BRH} ${H}`}>Désignation</div>
+        <div className={`${CH} ${BRH} ${H}`}>Qté</div>
+        <div className={`${CH} ${BRH} ${H}`}>P.U. HT</div>
+        <div className={`${CH} ${BRH} ${H}`}>Remise</div>
+        <div className={`${CH} ${showVat ? BR : ''} ${H}`}>{showVat ? 'Prix HT' : 'Montant'}</div>
         {showVat ? (
           <>
-            <div className={`${CN} ${BRH} ${H}`}>TVA</div>
-            <div className={`${CN} ${BRH} ${H}`}>Mt TVA</div>
-            <div className={`${CN} ${H}`}>TTC</div>
+            <div className={`${CH} ${BRH} ${H}`}>TVA</div>
+            <div className={`${CH} ${BRH} ${H}`}>Mt TVA</div>
+            <div className={`${CH} ${H}`}>TTC</div>
           </>
         ) : null}
 
         {/* Data rows */}
         {doc.lines.map((l, i) => (
           <div key={`row-${i}`} style={{ display: 'contents' }}>
-            <div className={`${CT} ${BR} text-[9px] text-slate-500`} title={l.sku}>{l.sku}</div>
+            <div className={`${CT} ${BR} break-all text-[9px] text-slate-500`} title={l.sku}>{l.sku}</div>
             <div className={`${CT} ${BR} break-words text-slate-900`} title={l.designation}>{l.designation}</div>
-            <div className={`${CN} ${BR}`}>{fmt(l.quantity)}</div>
-            <div className={`${CN} ${BR}`}>{fmt(l.unitPriceHT)}</div>
-            <div className={`${CN} ${BR}`}>{l.discountLabel || '—'}</div>
+            <div className={`${CNY} ${BR}`}>{fmt(l.quantity)}</div>
+            <div className={`${CNY} ${BR}`}>{fmt(showVat ? l.unitPriceHT : l.unitPriceHT * (1 + l.taxRate / 100))}</div>
+            <div className={`${CNY} ${BR}`}>{l.discountLabel || '—'}</div>
             {showVat ? (
               <>
-                <div className={`${CN} ${BR}`}>{fmt(l.lineHT)}</div>
-                <div className={`${CN} ${BR}`}>{fmt(l.taxRate)}</div>
-                <div className={`${CN} ${BR}`}>{fmt(l.lineTVA)}</div>
-                <div className={CN}>{fmt(l.lineTTC)}</div>
+                <div className={`${CNY} ${BR}`}>{fmt(l.lineHT)}</div>
+                <div className={`${CNY} ${BR}`}>{fmt(l.taxRate)}</div>
+                <div className={`${CNY} ${BR}`}>{fmt(l.lineTVA)}</div>
+                <div className={CNY}>{fmt(l.lineTTC)}</div>
               </>
             ) : (
-              <div className={CN}>{fmt(l.lineHT)}</div>
+              <div className={CNY}>{fmt(l.lineTTC)}</div>
             )}
           </div>
         ))}
 
-        {/* Fill row — 1fr extends vertical lines to grid bottom border */}
-        {Array.from({ length: fillCells }).map((_, i) => (
+        {/* Fill row — 1fr extends vertical lines to grid bottom edge */}
+        {Array.from({ length: fillCells - 1 }).map((_, i) => (
           <div key={`fill-${i}`} className={BR} />
         ))}
         <div />
@@ -208,28 +199,47 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
           </div>
 
           <div className="w-[42%] space-y-0.5 text-[9px]">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Total HT</span>
-              <span className="font-medium">{money(doc.totalHT)}</span>
-            </div>
-            {doc.discountGlobal > 0 ? (
-              <div className="flex justify-between">
-                <span className="text-slate-500">Remise globale</span>
-                <span className="font-medium text-red-600">-{money(doc.discountGlobal)}</span>
-              </div>
-            ) : null}
-            <div className="flex justify-between">
-              <span className="text-slate-500">Total HT après remise</span>
-              <span className="font-medium">{money(doc.totalHTAfterDiscount)}</span>
-            </div>
-            {showVat
-              ? doc.vatBreakdown.map((b) => (
+            {showVat ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total HT</span>
+                  <span className="font-medium">{money(doc.totalHT)}</span>
+                </div>
+                {doc.discountGlobal > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Remise globale</span>
+                    <span className="font-medium text-red-600">-{money(doc.discountGlobal)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total HT après remise</span>
+                  <span className="font-medium">{money(doc.totalHTAfterDiscount)}</span>
+                </div>
+                {doc.vatBreakdown.map((b) => (
                   <div key={b.rate} className="flex justify-between">
                     <span className="text-slate-500">TVA {fmt(b.rate)}%</span>
                     <span className="font-medium">{money(b.tva)}</span>
                   </div>
-                ))
-              : null}
+                ))}
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total</span>
+                  <span className="font-medium">{money(grossTTC)}</span>
+                </div>
+                {discountTTC > 0.001 ? (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Remise globale</span>
+                    <span className="font-medium text-red-600">-{money(discountTTC)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total après remise</span>
+                  <span className="font-medium">{money(netTTCExclTimbre)}</span>
+                </div>
+              </>
+            )}
             {doc.timbreFiscal > 0 ? (
               <div className="flex justify-between">
                 <span className="text-slate-500">Timbre fiscal</span>

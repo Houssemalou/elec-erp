@@ -41,8 +41,10 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   if (!invoice) notFound()
 
   const customerName =
-    invoice.customer.companyName ||
-    [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ') ||
+    invoice.customerName ||
+    (invoice.customer
+      ? invoice.customer.companyName || [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ')
+      : null) ||
     'Client'
 
   const totalTTC = Number(invoice.totalTTC)
@@ -79,7 +81,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Client" subtitle={invoice.customer.type === 'PROFESSIONNEL' ? 'Professionnel' : 'Particulier'} />
+            <CardHeader title="Client" subtitle={invoice.customer?.type === 'PROFESSIONNEL' ? 'Professionnel' : 'Particulier'} />
             <div className="grid gap-4 p-5 text-sm sm:grid-cols-2">
               <div>
                 <p className="text-xs text-white/40">Nom</p>
@@ -87,11 +89,19 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               </div>
               <div>
                 <p className="text-xs text-white/40">Matricule fiscal</p>
-                <p className="font-mono text-white/70">{invoice.customer.matriculeFiscal ?? '—'}</p>
+                <p className="font-mono text-white/70">{invoice.customerMatricule ?? invoice.customer?.matriculeFiscal ?? '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40">CIN</p>
-                <p className="font-mono text-white/70">{invoice.customer.cin ?? '—'}</p>
+                <p className="font-mono text-white/70">{invoice.customer?.cin ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/40">Ville</p>
+                <p className="font-mono text-white/70">{invoice.customerCity ?? invoice.customer?.city ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/40">Adresse</p>
+                <p>{invoice.customerAddress ?? invoice.customer?.address ?? '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-white/40">Émise le</p>
@@ -121,7 +131,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               <tbody>
                 {invoice.items.map((i) => (
                   <TR key={i.id}>
-                    <TD className="font-mono text-xs text-white/50">{i.sku}</TD>
+                    <TD className="font-mono text-xs break-all text-white/50">{i.sku}</TD>
                     <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>

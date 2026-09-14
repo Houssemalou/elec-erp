@@ -8,12 +8,11 @@ export const dynamic = 'force-dynamic'
 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [quote, customers, products] = await Promise.all([
+  const [quote, products] = await Promise.all([
     db.quote.findUnique({
       where: { id },
       include: { items: { include: { taxRate: true } }, customer: true },
     }),
-    db.customer.findMany({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
     db.product.findMany({
       where: { isActive: true },
       include: { taxRate: true },
@@ -21,9 +20,6 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
     }),
   ])
   if (!quote) notFound()
-
-  const customerName = (c: (typeof customers)[number]) =>
-    c.companyName || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Client sans nom'
 
   const lines: DocLine[] = quote.items.map((i, idx) => ({
     key: `existing-${idx}`,
@@ -43,12 +39,14 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
       <Card className="p-6">
         <DocumentForm
           partyLabel="Client"
-          partyOptions={customers.map((c) => ({ id: c.id, label: customerName(c), companyName: c.companyName }))}
+          partyFreeText
+          defaultPartyFreeText={quote.customerName ?? ''}
+          showVatOption
+          defaultNonAssujettiTva={quote.nonAssujettiTva}
           products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), taxRate: Number(p.taxRate.rate) }))}
           submitAction={updateQuoteAction.bind(null, id)}
           successPath="/devis"
           submitLabel="Enregistrer les modifications"
-          defaultPartyId={quote.customerId}
           defaultLines={lines}
           defaultGlobalDiscountType={Number(quote.discountGlobal) > 0 ? 'AMOUNT' : ''}
           defaultGlobalDiscountValue={String(Number(quote.discountGlobal) || '')}
@@ -57,7 +55,6 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
           dateLabel="Valide jusqu&apos;au"
           dateName="validUntil"
           defaultDate={quote.validUntil ? quote.validUntil.toISOString().slice(0, 10) : ''}
-          partyCompanyName
         />
       </Card>
     </div>

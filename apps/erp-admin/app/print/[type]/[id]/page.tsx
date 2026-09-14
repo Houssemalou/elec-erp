@@ -21,14 +21,6 @@ function discountLabel(line: {
   return `${Number(line.discountValue).toLocaleString('fr-FR')} DT`
 }
 
-function partyName(p: {
-  companyName: string | null
-  firstName: string | null
-  lastName: string | null
-}) {
-  return p.companyName || [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Client'
-}
-
 function mapLines<T extends { taxRate: { rate: { toString(): string } } }>(
   items: Array<
     T & {
@@ -100,6 +92,13 @@ export default async function PrintPage({
       include: { customer: true, items: { include: { taxRate: true } } },
     })
     if (!quote) notFound()
+    const customerName =
+      quote.customerName ||
+      (quote.customer
+        ? quote.customer.companyName || [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ')
+        : null) ||
+      'Client'
+    const quoteShowVat = sp.vat === '0' ? false : sp.vat === '1' ? true : !quote.nonAssujettiTva
     doc = {
       title: 'DEVIS',
       number: quote.number,
@@ -108,11 +107,11 @@ export default async function PrintPage({
         ? `Valable jusqu'au ${quote.validUntil.toLocaleDateString('fr-FR')}`
         : undefined,
       party: {
-        name: partyName(quote.customer),
-        matriculeFiscal: quote.customer.matriculeFiscal,
-        cin: quote.customer.cin,
-        address: quote.customer.address,
-        city: quote.customer.city,
+        name: customerName,
+        matriculeFiscal: quote.customer?.matriculeFiscal ?? null,
+        cin: quote.customer?.cin ?? null,
+        address: quote.customer?.address ?? null,
+        city: quote.customer?.city ?? null,
       },
       lines: mapLines(quote.items),
       totalHT: Number(quote.totalHT) + Number(quote.discountGlobal),
@@ -122,6 +121,8 @@ export default async function PrintPage({
       totalTVA: Number(quote.totalTVA),
       timbreFiscal: 0,
       totalTTC: Number(quote.totalTTC),
+      showVat: quoteShowVat,
+      nonAssujettiTva: !quoteShowVat,
       notes: quote.notes,
       conditions: quote.conditions,
       store,
@@ -132,6 +133,12 @@ export default async function PrintPage({
       include: { customer: true, items: { include: { taxRate: true } } },
     })
     if (!invoice) notFound()
+    const invoiceCustomerName =
+      invoice.customerName ||
+      (invoice.customer
+        ? invoice.customer.companyName || [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ')
+        : null) ||
+      'Client'
     doc = {
       title: 'FACTURE',
       number: invoice.number,
@@ -140,11 +147,11 @@ export default async function PrintPage({
         ? `Échéance : ${invoice.dueDate.toLocaleDateString('fr-FR')}`
         : undefined,
       party: {
-        name: partyName(invoice.customer),
-        matriculeFiscal: invoice.customer.matriculeFiscal,
-        cin: invoice.customer.cin,
-        address: invoice.customer.address,
-        city: invoice.customer.city,
+        name: invoiceCustomerName,
+        matriculeFiscal: invoice.customerMatricule ?? invoice.customer?.matriculeFiscal ?? null,
+        cin: invoice.customer?.cin ?? null,
+        address: invoice.customerAddress ?? invoice.customer?.address ?? null,
+        city: invoice.customerCity ?? invoice.customer?.city ?? null,
       },
       lines: mapLines(invoice.items),
       totalHT: Number(invoice.totalHT) + Number(invoice.discountGlobal),
@@ -167,17 +174,23 @@ export default async function PrintPage({
       include: { customer: true, items: { include: { taxRate: true } }, invoice: true },
     })
     if (!note) notFound()
+    const noteCustomerName =
+      note.customerName ||
+      (note.customer
+        ? note.customer.companyName || [note.customer.firstName, note.customer.lastName].filter(Boolean).join(' ')
+        : null) ||
+      'Client'
     doc = {
       title: 'AVOIR',
       number: note.number,
       date: note.createdAt,
       secondaryDate: note.invoice ? `Facture d'origine : ${note.invoice.number}` : undefined,
       party: {
-        name: partyName(note.customer),
-        matriculeFiscal: note.customer.matriculeFiscal,
-        cin: note.customer.cin,
-        address: note.customer.address,
-        city: note.customer.city,
+        name: noteCustomerName,
+        matriculeFiscal: note.customerMatricule ?? note.customer?.matriculeFiscal ?? null,
+        cin: note.customer?.cin ?? null,
+        address: note.customerAddress ?? note.customer?.address ?? null,
+        city: note.customerCity ?? note.customer?.city ?? null,
       },
       reason: note.reason,
       lines: mapLines(note.items),

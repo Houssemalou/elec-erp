@@ -79,8 +79,14 @@ export default async function FinancePage() {
 
   const topCustomers = invoices
     .reduce<Record<string, { name: string; total: number }>>((acc, i) => {
-      const name = i.customer.companyName || [i.customer.firstName, i.customer.lastName].filter(Boolean).join(' ') || 'Client'
-      acc[i.customerId] = { name, total: (acc[i.customerId]?.total ?? 0) + Number(i.totalTTC) }
+      const name =
+        i.customerName ||
+        (i.customer
+          ? i.customer.companyName || [i.customer.firstName, i.customer.lastName].filter(Boolean).join(' ')
+          : null) ||
+        'Client'
+      const key = i.customerId ?? `free|${name}`
+      acc[key] = { name, total: (acc[key]?.total ?? 0) + Number(i.totalTTC) }
       return acc
     }, {})
   const topList = Object.values(topCustomers).sort((a, b) => b.total - a.total).slice(0, 5)
