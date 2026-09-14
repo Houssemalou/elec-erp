@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { db } from '@elec/db'
 import { AddToCart } from '@/components/cart/add-to-cart'
 import { ProductCard } from '@/components/product-card'
+import { ProductGallery } from '@/components/product-gallery'
 import { money } from '@/lib/format'
 import { ShieldCheck, Truck, RotateCcw, FileText } from 'lucide-react'
 
@@ -17,7 +18,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   if (!product || !product.isActive) notFound()
 
   const totalStock = product.stockLevels.reduce((s, l) => s + (Number(l.quantity) - Number(l.reservedQuantity)), 0)
-  const image = product.images.find((i) => i.isPrimary) ?? product.images[0]
+  const images = product.images
+    .slice()
+    .sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0) || a.sortOrder - b.sortOrder)
+  const image = images[0]
 
   const related = await db.product.findMany({
     where: { isActive: true, categoryId: product.categoryId, id: { not: product.id } },
@@ -28,12 +32,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
       <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
-        <div className="flex h-96 items-center justify-center overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--bg-card)]">
-          {image ? (
-            <img src={image.url} alt={product.name} className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-7xl">⚡</span>
-          )}
+        <div className="h-96 md:h-[28rem]">
+          <ProductGallery images={images} name={product.name} />
         </div>
 
         <div>
