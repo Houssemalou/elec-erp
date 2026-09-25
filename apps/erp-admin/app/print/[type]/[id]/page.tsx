@@ -97,7 +97,7 @@ export default async function PrintPage({
       (quote.customer
         ? quote.customer.companyName || [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ')
         : null) ||
-      'Client'
+      null
     const quoteShowVat = sp.vat === '0' ? false : sp.vat === '1' ? true : !quote.nonAssujettiTva
     doc = {
       title: 'DEVIS',
@@ -138,7 +138,7 @@ export default async function PrintPage({
       (invoice.customer
         ? invoice.customer.companyName || [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ')
         : null) ||
-      'Client'
+      null
     doc = {
       title: 'FACTURE',
       number: invoice.number,
@@ -179,7 +179,7 @@ export default async function PrintPage({
       (note.customer
         ? note.customer.companyName || [note.customer.firstName, note.customer.lastName].filter(Boolean).join(' ')
         : null) ||
-      'Client'
+      null
     doc = {
       title: 'AVOIR',
       number: note.number,

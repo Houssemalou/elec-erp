@@ -20,6 +20,11 @@ const fmt = (n: number | string | Prisma.Decimal) => {
 /** Permet au moteur PDF de couper une référence trop longue sur plusieurs lignes. */
 const breakable = (s: string) => (s.length > 9 ? s.split('').join('\u200B') : s)
 
+function cleanText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
 const styles = StyleSheet.create({
   page: {
     backgroundColor: '#ffffff',
@@ -76,11 +81,11 @@ const styles = StyleSheet.create({
   colMtTva: { width: '9%' },
   colTtc: { width: '8%' },
   colSkuN: { width: '12%' },
-  colDesignationN: { width: '32%' },
+  colDesignationN: { width: '44%' },
   colQtyN: { width: '8%' },
   colPuN: { width: '14%' },
   colRemiseN: { width: '10%' },
-  colPrixHTN: { width: '24%' },
+  colPrixHTN: { width: '12%' },
   cellCenter: { textAlign: 'center' },
   noticeBox: {
     borderWidth: 1,
@@ -143,7 +148,7 @@ export interface PdfDocumentData {
   number: string
   date: Date
   secondaryDate?: { label: string; value?: string }
-  customer: { name: string; matriculeFiscal?: string | null; cin?: string | null; address?: string | null; city?: string | null }
+  customer: { name: string | null; matriculeFiscal?: string | null; cin?: string | null; address?: string | null; city?: string | null }
   lines: PdfLine[]
   totalHTBeforeGlobal: number
   discountGlobal: number
@@ -177,6 +182,13 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
   const grossTTC = data.lines.reduce((s, l) => s + l.lineTTC, 0)
   const netTTCExclTimbre = data.totalHTBeforeGlobal - data.discountGlobal + data.totalTVA
   const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
+  const customerName = cleanText(data.customer.name)
+  const customerMatriculeFiscal = cleanText(data.customer.matriculeFiscal)
+  const customerCin = cleanText(data.customer.cin)
+  const customerAddress = cleanText(data.customer.address)
+  const customerCity = cleanText(data.customer.city)
+  const customerLocation = [customerAddress, customerCity].filter(Boolean).join(', ') || null
+  const hasCustomerInfo = Boolean(customerName || customerMatriculeFiscal || customerCin || customerLocation)
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -201,15 +213,21 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
         </View>
 
         {/* Client */}
-        <View style={styles.section}>
-          <View style={styles.block}>
-            <Text style={styles.blockLabel}>Adressé à</Text>
-            <Text style={{ fontSize: 9, fontWeight: 700 }}>{data.customer.name}</Text>
-            {data.customer.matriculeFiscal ? <Text>Matricule fiscal : {data.customer.matriculeFiscal}</Text> : null}
-            {data.customer.cin ? <Text>CIN : {data.customer.cin}</Text> : null}
-            {data.customer.address ? <Text>{data.customer.address}{data.customer.city ? `, ${data.customer.city}` : ''}</Text> : null}
+        {hasCustomerInfo ? (
+          <View style={styles.section}>
+            <View style={styles.block}>
+              {customerName ? (
+                <>
+                  <Text style={styles.blockLabel}>Adressé à</Text>
+                  <Text style={{ fontSize: 9, fontWeight: 700 }}>{customerName}</Text>
+                </>
+              ) : null}
+              {customerMatriculeFiscal ? <Text>Matricule fiscal : {customerMatriculeFiscal}</Text> : null}
+              {customerCin ? <Text>CIN : {customerCin}</Text> : null}
+              {customerLocation ? <Text>{customerLocation}</Text> : null}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Tableau des lignes — vertical lines extend through all rows */}
         <View style={styles.table}>
@@ -428,8 +446,7 @@ export async function generateInvoicePdf(
         (invoice.customer
           ? invoice.customer.companyName ||
             [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ')
-          : null) ||
-        'Client',
+          : null),
       matriculeFiscal: invoice.customerMatricule ?? invoice.customer?.matriculeFiscal ?? null,
       cin: invoice.customer?.cin ?? null,
       address: invoice.customerAddress ?? invoice.customer?.address ?? null,
@@ -472,9 +489,8 @@ export async function generateQuotePdf(quoteId: string, options?: { withVat?: bo
     quote.customerName ||
     (quote.customer
       ? quote.customer.companyName ||
-        [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ') ||
-        'Client'
-      : 'Client')
+        [quote.customer.firstName, quote.customer.lastName].filter(Boolean).join(' ')
+      : null)
   const showVat = options?.withVat !== undefined ? options.withVat : !quote.nonAssujettiTva
   const data: PdfDocumentData = {
     type: 'quote',
@@ -532,8 +548,7 @@ export async function generateCreditNotePdf(creditNoteId: string): Promise<Buffe
         note.customerName ||
         (note.customer
           ? note.customer.companyName || [note.customer.firstName, note.customer.lastName].filter(Boolean).join(' ')
-          : null) ||
-        'Client',
+          : null),
       matriculeFiscal: note.customerMatricule ?? note.customer?.matriculeFiscal ?? null,
       cin: note.customer?.cin ?? null,
       address: note.customerAddress ?? note.customer?.address ?? null,

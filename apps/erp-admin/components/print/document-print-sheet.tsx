@@ -26,7 +26,7 @@ export interface PrintStore {
 }
 
 export interface PrintParty {
-  name: string
+  name: string | null
   matriculeFiscal?: string | null
   cin?: string | null
   address?: string | null
@@ -67,7 +67,7 @@ const fmt = (n: number) => {
 
 function buildColumns(showVat: boolean): string {
   if (!showVat) {
-    return ['12%', '32%', '8%', '14%', '10%', '24%'].join(' ')
+    return ['12%', '44%', '8%', '14%', '10%', '12%'].join(' ')
   }
   return ['9%', '28%', '7%', '10%', '9%', '11%', '9%', '9%', '8%'].join(' ')
 }
@@ -81,6 +81,11 @@ const H = 'bg-slate-50 text-[9px] font-semibold uppercase tracking-wide text-sla
 const BR = 'border-r border-slate-800'
 const BRH = 'border-r border-slate-800'
 
+function cleanText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
 export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const dateStr = doc.date.toLocaleDateString('fr-FR')
   const showVat = doc.showVat !== false
@@ -88,6 +93,14 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const grossTTC = doc.lines.reduce((s, l) => s + l.lineTTC, 0)
   const netTTCExclTimbre = doc.totalHTAfterDiscount + doc.totalTVA
   const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
+  const partyName = cleanText(doc.party.name)
+  const partyMatriculeFiscal = cleanText(doc.party.matriculeFiscal)
+  const partyCin = cleanText(doc.party.cin)
+  const partyAddress = cleanText(doc.party.address)
+  const partyCity = cleanText(doc.party.city)
+  const partyLocation = [partyAddress, partyCity].filter(Boolean).join(', ') || null
+  const hasPartyInfo = Boolean(partyName || partyMatriculeFiscal || partyCin || partyLocation)
+  const reason = cleanText(doc.reason)
   const fillCells = showVat ? 9 : 6
   const gridCols = buildColumns(showVat)
 
@@ -114,23 +127,29 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
       </div>
 
       {/* ── Client ── */}
-      <div className="mt-2 flex shrink-0 gap-8">
-        <div>
-          <p className="text-[8px] font-semibold uppercase tracking-wide text-slate-400">Adressé à</p>
-          <p className="text-[11px] font-bold text-slate-900">{doc.party.name}</p>
-          {doc.party.matriculeFiscal ? <p className="text-[9px] text-slate-600">MF : {doc.party.matriculeFiscal}</p> : null}
-          {doc.party.cin ? <p className="text-[9px] text-slate-600">CIN : {doc.party.cin}</p> : null}
-          {doc.party.address || doc.party.city ? (
-            <p className="text-[9px] text-slate-600">{[doc.party.address, doc.party.city].filter(Boolean).join(', ')}</p>
+      {hasPartyInfo || reason ? (
+        <div className="mt-2 flex shrink-0 gap-8">
+          {hasPartyInfo ? (
+            <div>
+              {partyName ? (
+                <>
+                  <p className="text-[8px] font-semibold uppercase tracking-wide text-slate-400">Adressé à</p>
+                  <p className="text-[11px] font-bold text-slate-900">{partyName}</p>
+                </>
+              ) : null}
+              {partyMatriculeFiscal ? <p className="text-[9px] text-slate-600">MF : {partyMatriculeFiscal}</p> : null}
+              {partyCin ? <p className="text-[9px] text-slate-600">CIN : {partyCin}</p> : null}
+              {partyLocation ? <p className="text-[9px] text-slate-600">{partyLocation}</p> : null}
+            </div>
+          ) : null}
+          {reason ? (
+            <div>
+              <p className="text-[8px] font-semibold uppercase tracking-wide text-slate-400">Motif</p>
+              <p className="text-[9px] text-slate-700">{reason}</p>
+            </div>
           ) : null}
         </div>
-        {doc.reason ? (
-          <div>
-            <p className="text-[8px] font-semibold uppercase tracking-wide text-slate-400">Motif</p>
-            <p className="text-[9px] text-slate-700">{doc.reason}</p>
-          </div>
-        ) : null}
-      </div>
+      ) : null}
 
       {/* ── Grid — fills remaining space, vertical lines stop at its bottom edge ── */}
       <div

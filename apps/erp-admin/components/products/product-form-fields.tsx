@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Label, Input, Select, Textarea } from '@/components/ui'
+import { useRef, useState } from 'react'
+import { Label, Input, Textarea } from '@/components/ui'
 
 export interface ProductFormFieldsProps {
   product?: {
@@ -23,59 +23,94 @@ export interface ProductFormFieldsProps {
     images: Array<{ url: string; isPrimary: boolean }>
   }
   categories: Array<{ id: string; name: string; markupPercent?: number | null; preRef?: string | null }>
-  taxRates: Array<{ id: string; label: string; rate: number }>
+  taxRates: Array<{ id: string; label: string; rate: number; isDefault?: boolean }>
+}
+
+function roundPrice(value: number): number {
+  return Math.round((value + Number.EPSILON) * 1000) / 1000
+}
+
+function calculatePriceTTC(priceHT: string, rate: number | undefined): string {
+  if (!priceHT.trim() || rate === undefined || !Number.isFinite(rate)) return ''
+  const value = Number(priceHT)
+  if (!Number.isFinite(value)) return ''
+  return roundPrice(value * (1 + rate / 100)).toFixed(3)
+}
+
+function calculatePriceHT(priceTTC: string, rate: number | undefined): string {
+  if (!priceTTC.trim() || rate === undefined || !Number.isFinite(rate)) return ''
+  const value = Number(priceTTC)
+  const factor = 1 + rate / 100
+  if (!Number.isFinite(value) || factor <= 0) return ''
+  return roundPrice(value / factor).toFixed(3)
 }
 
 export function ProductFormFields({ product, categories, taxRates }: ProductFormFieldsProps) {
   const imageList = product ? product.images.map((i) => i.url).join('\n') : ''
   const toDate = (v: unknown) => (typeof v === 'number' ? String(v) : String(v ?? ''))
-  const priceHTRef = useRef<HTMLInputElement>(null)
-  const costPriceRef = useRef<HTMLInputElement>(null)
-  const categoryRef = useRef<HTMLSelectElement>(null)
-  const userEditedRef = useRef(false)
+  const initialTaxRateId = product?.taxRateId ?? taxRates.find((t) => t.isDefault)?.id ?? ''
+  const initialTaxRate = taxRates.find((t) => t.id === initialTaxRateId)?.rate
+  const initialPriceHT = toDate(product?.priceHT)
+  const [priceHT, setPriceHT] = useState(initialPriceHT)
+  const [priceTTC, setPriceTTC] = useState(() => calculatePriceTTC(initialPriceHT, initialTaxRate))
+  const [costPrice, setCostPrice] = useState(toDate(product?.costPrice ?? ''))
   const [selectedCategoryId, setSelectedCategoryId] = useState(product?.categoryId ?? '')
+  const [selectedTaxRateId, setSelectedTaxRateId] = useState(initialTaxRateId)
+  const priceHTUserEditedRef = useRef(false)
 
   const selectedPreRef = categories.find((c) => c.id === selectedCategoryId)?.preRef ?? null
+  const selectedTaxRate = taxRates.find((t) => t.id === selectedTaxRateId)?.rate
   const autoSku = !!selectedPreRef && !product
 
-  useEffect(() => {
-    const priceEl = priceHTRef.current
-    const costEl = costPriceRef.current
-    const catEl = categoryRef.current
-    if (!priceEl || !costEl || !catEl) return
+  const updatePriceTTC = (nextPriceHT: string, rate = selectedTaxRate) => {
+    setPriceTTC(calculatePriceTTC(nextPriceHT, rate))
+  }
 
-    const onInput = () => { userEditedRef.current = true }
+  const applyMarkup = (nextCostPrice: string, categoryId: string, rate = selectedTaxRate): string | null => {
+    const cost = Number(nextCostPrice)
+    const category = categories.find((c) => c.id === categoryId)
+    const markup = Number(category?.markupPercent)
+    if (!nextCostPrice.trim() || !Number.isFinite(cost) || cost <= 0 || !category?.markupPercent || !Number.isFinite(markup)) return null
+    const computed = roundPrice(cost * (1 + markup / 100)).toFixed(3)
+    setPriceHT(computed)
+    updatePriceTTC(computed, rate)
+    return computed
+  }
 
-    priceEl.addEventListener('input', onInput)
-    return () => priceEl.removeEventListener('input', onInput)
-  }, [])
+  const handlePriceHTChange = (value: string) => {
+    priceHTUserEditedRef.current = true
+    setPriceHT(value)
+    updatePriceTTC(value)
+  }
 
-  useEffect(() => {
-    const priceEl = priceHTRef.current
-    const costEl = costPriceRef.current
-    const catEl = categoryRef.current
-    if (!priceEl || !costEl || !catEl) return
-
-    const recalc = () => {
-      if (userEditedRef.current) return
-      const cost = parseFloat(costEl.value)
-      if (!cost || isNaN(cost)) return
-      const catId = catEl.value
-      const cat = categories.find((c) => c.id === catId)
-      if (!cat?.markupPercent) return
-      const markup = Number(cat.markupPercent)
-      if (!markup || isNaN(markup)) return
-      const computed = cost * (1 + markup / 100)
-      priceEl.value = computed.toFixed(3)
+  const handlePriceTTCChange = (value: string) => {
+    priceHTUserEditedRef.current = true
+    setPriceTTC(value)
+    if (!value.trim()) {
+      setPriceHT('')
+      return
     }
+    const nextPriceHT = calculatePriceHT(value, selectedTaxRate)
+    if (nextPriceHT) setPriceHT(nextPriceHT)
+  }
 
-    costEl.addEventListener('input', recalc)
-    catEl.addEventListener('change', () => { userEditedRef.current = false; recalc() })
-    return () => {
-      costEl.removeEventListener('input', recalc)
-      catEl.removeEventListener('change', recalc)
-    }
-  }, [categories])
+  const handleCostPriceChange = (value: string) => {
+    setCostPrice(value)
+    if (!priceHTUserEditedRef.current) applyMarkup(value, selectedCategoryId)
+  }
+
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategoryId(value)
+    priceHTUserEditedRef.current = false
+    const computedPriceHT = applyMarkup(costPrice, value)
+    if (!computedPriceHT) updatePriceTTC(priceHT)
+  }
+
+  const handleTaxRateChange = (value: string) => {
+    const rate = taxRates.find((t) => t.id === value)?.rate
+    setSelectedTaxRateId(value)
+    updatePriceTTC(priceHT, rate)
+  }
 
   return (
     <>
@@ -119,25 +154,58 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
           <Input name="barcode" defaultValue={product?.barcode ?? ''} />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <div>
           <Label>Prix de revient (DT)</Label>
-          <input ref={costPriceRef} type="number" step="0.001" min="0" name="costPrice" defaultValue={toDate(product?.costPrice ?? '')} placeholder="Optionnel" className="h-11 w-full rounded-xl border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white placeholder:text-white/40 focus:border-accent-400 focus:outline-none focus:ring-2 focus:ring-accent-400/20" />
+          <Input
+            type="number"
+            step="0.001"
+            min="0"
+            name="costPrice"
+            value={costPrice}
+            onChange={(e) => handleCostPriceChange(e.target.value)}
+            placeholder="Optionnel"
+            className="h-11"
+          />
         </div>
         <div>
-          <Label>Prix HT (DT) *</Label>
-          <input ref={priceHTRef} type="number" step="0.001" min="0" name="priceHT" required defaultValue={toDate(product?.priceHT)} placeholder="0.000" className="h-11 w-full rounded-xl border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white placeholder:text-white/40 focus:border-accent-400 focus:outline-none focus:ring-2 focus:ring-accent-400/20" />
+          <Label>Prix de vente HT (DT) *</Label>
+          <Input
+            type="number"
+            step="0.001"
+            min="0"
+            name="priceHT"
+            value={priceHT}
+            onChange={(e) => handlePriceHTChange(e.target.value)}
+            required
+            placeholder="0.000"
+            className="h-11"
+          />
           <p className="mt-1 text-xs text-white/40">Calculé automatiquement si la catégorie a une marge définie, ou saisi manuellement.</p>
+        </div>
+        <div>
+          <Label>Prix de vente TTC (DT) *</Label>
+          <Input
+            type="number"
+            step="0.001"
+            min="0"
+            name="priceTTC"
+            value={priceTTC}
+            onChange={(e) => handlePriceTTCChange(e.target.value)}
+            required
+            placeholder="0.000"
+            className="h-11"
+          />
+          <p className="mt-1 text-xs text-white/40">Calculé automatiquement. Vous pouvez le modifier ; le prix HT sera ajusté.</p>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label>Catégorie</Label>
           <select
-            ref={categoryRef}
             name="categoryId"
-            defaultValue={product?.categoryId ?? ''}
-            onChange={(e) => setSelectedCategoryId(e.target.value)}
+            value={selectedCategoryId}
+            onChange={(e) => handleCategoryChange(e.target.value)}
             className="h-11 w-full rounded-xl border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white focus:border-accent-400 focus:outline-none"
           >
             <option value="">— Aucune —</option>
@@ -148,12 +216,18 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
         </div>
         <div>
           <Label>Taux de TVA *</Label>
-          <Select name="taxRateId" required defaultValue={product?.taxRateId}>
+          <select
+            name="taxRateId"
+            value={selectedTaxRateId}
+            onChange={(e) => handleTaxRateChange(e.target.value)}
+            required
+            className="h-11 w-full rounded-xl border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white focus:border-accent-400 focus:outline-none"
+          >
             <option value="">— Choisir —</option>
             {taxRates.map((t) => (
               <option key={t.id} value={t.id}>{t.label} ({Number(t.rate)}%)</option>
             ))}
-          </Select>
+          </select>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
