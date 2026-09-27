@@ -66,9 +66,9 @@ export const productSchema = z.object({
 })
 
 /**
- * Le matricule fiscal et le CIN restent facultatifs : une facture peut être émise
- * pour un client particulier, un prospect ou un client professionnel dont la
- * fiche n'est pas encore complète.
+ * Le matricule fiscal reste facultatif : une facture peut être émise pour un
+ * client particulier, un prospect ou un professionnel dont la fiche n'est pas
+ * encore complète.
  */
 export const customerSchema = z.object({
   type: z.enum(['PARTICULIER', 'PROFESSIONNEL']),
@@ -76,7 +76,6 @@ export const customerSchema = z.object({
   lastName: z.string().optional().nullable(),
   companyName: z.string().optional().nullable(),
   matriculeFiscal: z.string().optional().nullable(),
-  cin: z.string().optional().nullable(),
   email: z.string().email().optional().or(z.literal('')).nullable(),
   phone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),

@@ -28,7 +28,6 @@ export interface PrintStore {
 export interface PrintParty {
   name: string | null
   matriculeFiscal?: string | null
-  cin?: string | null
   address?: string | null
   city?: string | null
 }
@@ -95,11 +94,10 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
   const partyName = cleanText(doc.party.name)
   const partyMatriculeFiscal = cleanText(doc.party.matriculeFiscal)
-  const partyCin = cleanText(doc.party.cin)
   const partyAddress = cleanText(doc.party.address)
   const partyCity = cleanText(doc.party.city)
   const partyLocation = [partyAddress, partyCity].filter(Boolean).join(', ') || null
-  const hasPartyInfo = Boolean(partyName || partyMatriculeFiscal || partyCin || partyLocation)
+  const hasPartyInfo = Boolean(partyName || partyMatriculeFiscal || partyLocation)
   const reason = cleanText(doc.reason)
   const fillCells = showVat ? 9 : 6
   const gridCols = buildColumns(showVat)
@@ -138,7 +136,6 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
                 </>
               ) : null}
               {partyMatriculeFiscal ? <p className="text-[9px] text-slate-600">MF : {partyMatriculeFiscal}</p> : null}
-              {partyCin ? <p className="text-[9px] text-slate-600">CIN : {partyCin}</p> : null}
               {partyLocation ? <p className="text-[9px] text-slate-600">{partyLocation}</p> : null}
             </div>
           ) : null}

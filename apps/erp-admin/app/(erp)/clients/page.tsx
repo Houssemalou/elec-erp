@@ -24,7 +24,6 @@ export default async function ClientsPage({
           { lastName: { contains: q, mode: 'insensitive' as const } },
           { companyName: { contains: q, mode: 'insensitive' as const } },
           { matriculeFiscal: { contains: q, mode: 'insensitive' as const } },
-          { cin: { contains: q, mode: 'insensitive' as const } },
         ],
       }
     : undefined
@@ -70,7 +69,6 @@ export default async function ClientsPage({
               <TH>Client</TH>
               <TH>Type</TH>
               <TH>Matricule fiscal</TH>
-              <TH>CIN</TH>
               <TH>Contact</TH>
               <TH className="text-right">Factures</TH>
               <TH className="text-right">Devis</TH>
@@ -88,7 +86,6 @@ export default async function ClientsPage({
                   </Badge>
                 </TD>
                 <TD className="font-mono text-xs text-slate-500">{c.matriculeFiscal ?? '—'}</TD>
-                <TD className="font-mono text-xs text-slate-500">{c.cin ?? '—'}</TD>
                 <TD>{c.phone ?? c.email ?? '—'}</TD>
                 <TD className="text-right">{c._count.invoices}</TD>
                 <TD className="text-right">{c._count.quotes}</TD>

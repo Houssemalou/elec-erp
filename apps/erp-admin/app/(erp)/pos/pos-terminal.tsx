@@ -110,7 +110,6 @@ export default function PosTerminal({
   const [manualCompany, setManualCompany] = useState('')
   const [manualAddress, setManualAddress] = useState('')
   const [manualMatricule, setManualMatricule] = useState('')
-  const [manualCin, setManualCin] = useState('')
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE')
   const [discountValue, setDiscountValue] = useState('')
 
@@ -270,7 +269,6 @@ export default function PosTerminal({
       fd.set('manualCompany', manualCompany.trim())
       fd.set('manualAddress', manualAddress.trim())
       fd.set('manualMatricule', manualMatricule.trim())
-      fd.set('manualCin', manualCin.trim())
     }
 
     startTransition(async () => {
@@ -312,7 +310,6 @@ export default function PosTerminal({
         setManualCompany('')
         setManualAddress('')
         setManualMatricule('')
-        setManualCin('')
         setDiscountType('NONE')
         setDiscountValue('')
         setSearch('')
@@ -493,7 +490,7 @@ export default function PosTerminal({
                   ))}
                 </select>
                 <button
-                  onClick={() => { setCustomerId(''); setManualFirstName(''); setManualLastName(''); setManualCompany(''); setManualAddress(''); setManualMatricule(''); setManualCin(''); }}
+                  onClick={() => { setCustomerId(''); setManualFirstName(''); setManualLastName(''); setManualCompany(''); setManualAddress(''); setManualMatricule(''); }}
                   className="text-xs text-white/40 hover:text-accent-400 whitespace-nowrap"
                 >
                   Saisie manuelle
@@ -531,24 +528,15 @@ export default function PosTerminal({
                   placeholder="Matricule fiscal (optionnel)"
                   className="h-9 w-full rounded-lg border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white placeholder-white/30 focus:border-accent-400 focus:outline-none"
                 />
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
-                    placeholder="Adresse"
-                    className="h-9 flex-1 rounded-lg border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white placeholder-white/30 focus:border-accent-400 focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={manualCin}
-                    onChange={(e) => setManualCin(e.target.value)}
-                    placeholder="CIN"
-                    className="h-9 flex-1 rounded-lg border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white placeholder-white/30 focus:border-accent-400 focus:outline-none"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={manualAddress}
+                  onChange={(e) => setManualAddress(e.target.value)}
+                  placeholder="Adresse"
+                  className="h-9 w-full rounded-lg border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white placeholder-white/30 focus:border-accent-400 focus:outline-none"
+                />
                 <button
-                  onClick={() => { setManualFirstName(''); setManualLastName(''); setManualCompany(''); setManualAddress(''); setManualMatricule(''); setManualCin(''); }}
+                  onClick={() => { setManualFirstName(''); setManualLastName(''); setManualCompany(''); setManualAddress(''); setManualMatricule('') }}
                   className="text-xs text-white/40 hover:text-accent-400"
                 >
                   Choisir un client existant

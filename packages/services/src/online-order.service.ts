@@ -110,12 +110,6 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
 
     const totals = await computeOrderTotals(lines, shippingCost, withInvoice)
 
-    // Le site ne demande plus le CIN : on reprend celui déjà connu du client,
-    // sinon le magasin le saisit sur la fiche de la commande.
-    const customerCin = await tx.customer
-      .findUnique({ where: { id: input.customerId }, select: { cin: true } })
-      .then((c) => c?.cin ?? null)
-
     const order = await tx.onlineOrder.create({
       data: {
         number,
@@ -129,7 +123,6 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
         shippingAddress: input.shippingAddress,
         shippingCity: input.shippingCity,
         shippingPhone: input.shippingPhone,
-        cin: customerCin,
         shippingNote: input.shippingNote ?? null,
         shippingCost: toDecimalString(shippingCost),
         subtotalHT: toDecimalString(totals.subtotalHT),
@@ -339,32 +332,6 @@ export async function markOrderPaid(id: string, method: 'CARD' | 'EDAHABIA' | 'B
   return db.onlineOrder.update({
     where: { id },
     data: { paymentStatus: OnlinePaymentStatus.PAID, paymentMethod: method },
-  })
-}
-
-/**
- * Renseigne le numéro de carte d'identité du client. Le site vitrine ne le
- * demande plus : c'est le magasin qui le saisit ici, une fois la commande
- * reçue (retrait en magasin ou contrôle à la livraison).
- * Le CIN est aussi recopié sur la fiche client lorsqu'elle est encore vide,
- * pour qu'il apparaisse sur les factures et bons de livraison du dossier.
- */
-export async function updateOrderCin(id: string, cin: string | null) {
-  const value = cin && cin.trim() !== '' ? cin.trim() : null
-  return db.$transaction(async (tx) => {
-    const order = await tx.onlineOrder.findUnique({ where: { id }, select: { id: true, customerId: true } })
-    if (!order) throw new Error('Commande introuvable')
-
-    const updated = await tx.onlineOrder.update({ where: { id }, data: { cin: value } })
-
-    if (value) {
-      await tx.customer.updateMany({
-        where: { id: order.customerId, cin: null },
-        data: { cin: value },
-      })
-    }
-
-    return updated
   })
 }
 

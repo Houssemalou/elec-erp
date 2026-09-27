@@ -99,10 +99,6 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
                 <p className="font-mono text-white/70">{quote.customer?.matriculeFiscal ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-white/40">CIN</p>
-                <p className="font-mono text-white/70">{quote.customer?.cin ?? '—'}</p>
-              </div>
-              <div>
                 <p className="text-xs text-white/40">Email</p>
                 <p>{quote.customer?.email ?? '—'}</p>
               </div>

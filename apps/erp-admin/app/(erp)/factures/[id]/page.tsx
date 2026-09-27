@@ -92,10 +92,6 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 <p className="font-mono text-white/70">{invoice.customerMatricule ?? invoice.customer?.matriculeFiscal ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-white/40">CIN</p>
-                <p className="font-mono text-white/70">{invoice.customer?.cin ?? '—'}</p>
-              </div>
-              <div>
                 <p className="text-xs text-white/40">Adresse</p>
                 <p>{invoice.customerAddress ?? invoice.customer?.address ?? '—'}</p>
               </div>

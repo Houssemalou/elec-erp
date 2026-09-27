@@ -32,7 +32,6 @@ import {
   cancelOrder,
   updateOrderStatus,
   markOrderPaid,
-  updateOrderCin,
   adjustStock,
   transferStock,
   runInventory,
@@ -488,7 +487,6 @@ export async function createCustomer(fd: FormData): Promise<ActionResult> {
       lastName: str(fd, 'lastName') || null,
       companyName: str(fd, 'companyName') || null,
       matriculeFiscal: str(fd, 'matriculeFiscal') || null,
-      cin: str(fd, 'cin') || null,
       email: str(fd, 'email') || null,
       phone: str(fd, 'phone') || null,
       address: str(fd, 'address') || null,
@@ -515,7 +513,6 @@ export async function updateCustomer(id: string, fd: FormData): Promise<ActionRe
       lastName: str(fd, 'lastName') || null,
       companyName: str(fd, 'companyName') || null,
       matriculeFiscal: str(fd, 'matriculeFiscal') || null,
-      cin: str(fd, 'cin') || null,
       email: str(fd, 'email') || null,
       phone: str(fd, 'phone') || null,
       address: str(fd, 'address') || null,
@@ -994,21 +991,6 @@ export async function markOrderPaidAction(id: string, method: string): Promise<A
   }
 }
 
-/** Le CIN n'est plus demandé sur le site : le magasin le saisit sur la commande. */
-export async function updateOrderCinAction(id: string, cin: string): Promise<ActionResult> {
-  const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
-  try {
-    await updateOrderCin(id, cin)
-    revalidatePath('/commandes')
-    revalidatePath(`/commandes/${id}`)
-    revalidatePath('/clients')
-    return { success: true }
-  } catch (e) {
-    return { success: false, error: (e as Error).message }
-  }
-}
-
 export async function createInvoiceFromOrderAction(id: string, fd?: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
@@ -1155,18 +1137,17 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
   }
 
   // Manual client info for invoice
-  let manualClient: { firstName: string; lastName?: string; companyName?: string; address?: string; matriculeFiscal?: string; cin?: string } | null = null
+  let manualClient: { firstName: string; lastName?: string; companyName?: string; address?: string; matriculeFiscal?: string } | null = null
   if (generateInvoice && !customerId) {
     const firstName = str(fd, 'manualFirstName')
     const lastName = str(fd, 'manualLastName')
     const companyName = str(fd, 'manualCompany')
     const address = str(fd, 'manualAddress')
     const matriculeFiscal = str(fd, 'manualMatricule')
-    const cin = str(fd, 'manualCin')
     if (!firstName) {
       return { success: false, error: 'Le nom du client est requis pour générer une facture' }
     }
-    manualClient = { firstName, lastName, companyName, address, matriculeFiscal, cin }
+    manualClient = { firstName, lastName, companyName, address, matriculeFiscal }
   }
 
   // Discount

@@ -11,7 +11,6 @@ const FACTURE = {
   client: {
     firstName: 'HOUSSEM',
     lastName: 'ALOUI',
-    cin: '1994856B',
     address: 'OUCHTATA NEFZA BEJA',
   },
   totaux: {
@@ -135,13 +134,14 @@ async function main() {
     console.log('  Fournisseur cree : ' + supplier.name)
   }
 
-  let customer = await prisma.customer.findFirst({ where: { cin: FACTURE.client.cin } })
+  let customer = await prisma.customer.findFirst({
+    where: { firstName: FACTURE.client.firstName, lastName: FACTURE.client.lastName },
+  })
   if (!customer) {
     customer = await prisma.customer.create({
       data: {
         firstName: FACTURE.client.firstName,
         lastName: FACTURE.client.lastName,
-        cin: FACTURE.client.cin,
         address: FACTURE.client.address,
         type: 'PROFESSIONNEL',
       },
@@ -229,10 +229,12 @@ async function main() {
   })
 
   for (const p of PRODUITS) {
+    const created = productMap[p.ref]
+    if (!created) throw new Error('Produit non cree : ' + p.ref)
     await prisma.purchaseOrderItem.create({
       data: {
         purchaseOrderId: purchaseOrder.id,
-        productId: productMap[p.ref].id,
+        productId: created.id,
         quantity: p.qte,
         unitPriceHT: to3(p.puHT),
         taxRateId: tax19.id,

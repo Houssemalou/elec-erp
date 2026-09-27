@@ -4,13 +4,12 @@ import { FileDown } from 'lucide-react'
 import { PageHeader, Card, CardHeader, Badge, Table, THead, TR, TH, TD, Button } from '@/components/ui'
 import { ActionButton } from '@/components/ui/action-button'
 import { DocumentTotals } from '@/components/documents/document-totals'
-import { CancelOrderButton, StatusUpdater, GenerateInvoiceButton, OrderCinField } from '@/components/orders/order-actions'
+import { CancelOrderButton, StatusUpdater, GenerateInvoiceButton } from '@/components/orders/order-actions'
 import {
   confirmOrderAction,
   cancelOrderAction,
   updateOrderStatusAction,
   markOrderPaidAction,
-  updateOrderCinAction,
   createInvoiceFromOrderAction,
 } from '@/lib/actions/erp'
 import { db } from '@elec/db'
@@ -40,9 +39,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const canConfirm = order.status === 'PENDING' || order.status === 'PREPARING'
   const canCancel = !lockedStatuses.includes(order.status)
-  // Les commandes antérieures à la suppression du CIN sur le site l'ont sur la
-  // fiche client : on l'affiche quand même pour ne pas perdre l'information.
-  const orderCin = order.cin ?? order.customer.cin
   const invoice = await db.invoice.findFirst({
     where: { customerId: order.customerId, notes: { contains: order.number } },
     orderBy: { createdAt: 'desc' },
@@ -88,14 +84,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 <p className="text-xs text-slate-400">Téléphone</p>
                 <p>{order.shippingPhone}</p>
               </div>
-              {lockedStatuses.includes(order.status) ? (
-                <div>
-                  <p className="text-xs text-slate-400">CIN (carte d&apos;identité)</p>
-                  <p className="font-mono text-slate-900">{orderCin ?? '—'}</p>
-                </div>
-              ) : (
-                <OrderCinField id={order.id} cin={orderCin} action={updateOrderCinAction} />
-              )}
               {order.deliveryMethod === 'PICKUP' ? (
                 <div>
                   <p className="text-xs text-slate-400">Mode de réception</p>

@@ -109,7 +109,6 @@ export default async function PrintPage({
       party: {
         name: customerName,
         matriculeFiscal: quote.customer?.matriculeFiscal ?? null,
-        cin: quote.customer?.cin ?? null,
         address: quote.customer?.address ?? null,
         city: quote.customer?.city ?? null,
       },
@@ -149,7 +148,6 @@ export default async function PrintPage({
       party: {
         name: invoiceCustomerName,
         matriculeFiscal: invoice.customerMatricule ?? invoice.customer?.matriculeFiscal ?? null,
-        cin: invoice.customer?.cin ?? null,
         address: invoice.customerAddress ?? invoice.customer?.address ?? null,
         city: invoice.customerCity ?? invoice.customer?.city ?? null,
       },
@@ -188,7 +186,6 @@ export default async function PrintPage({
       party: {
         name: noteCustomerName,
         matriculeFiscal: note.customerMatricule ?? note.customer?.matriculeFiscal ?? null,
-        cin: note.customer?.cin ?? null,
         address: note.customerAddress ?? note.customer?.address ?? null,
         city: note.customerCity ?? note.customer?.city ?? null,
       },

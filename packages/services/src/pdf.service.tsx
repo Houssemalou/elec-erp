@@ -148,7 +148,7 @@ export interface PdfDocumentData {
   number: string
   date: Date
   secondaryDate?: { label: string; value?: string }
-  customer: { name: string | null; matriculeFiscal?: string | null; cin?: string | null; address?: string | null; city?: string | null }
+  customer: { name: string | null; matriculeFiscal?: string | null; address?: string | null; city?: string | null }
   lines: PdfLine[]
   totalHTBeforeGlobal: number
   discountGlobal: number
@@ -184,11 +184,10 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
   const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
   const customerName = cleanText(data.customer.name)
   const customerMatriculeFiscal = cleanText(data.customer.matriculeFiscal)
-  const customerCin = cleanText(data.customer.cin)
   const customerAddress = cleanText(data.customer.address)
   const customerCity = cleanText(data.customer.city)
   const customerLocation = [customerAddress, customerCity].filter(Boolean).join(', ') || null
-  const hasCustomerInfo = Boolean(customerName || customerMatriculeFiscal || customerCin || customerLocation)
+  const hasCustomerInfo = Boolean(customerName || customerMatriculeFiscal || customerLocation)
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -223,7 +222,6 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
                 </>
               ) : null}
               {customerMatriculeFiscal ? <Text>Matricule fiscal : {customerMatriculeFiscal}</Text> : null}
-              {customerCin ? <Text>CIN : {customerCin}</Text> : null}
               {customerLocation ? <Text>{customerLocation}</Text> : null}
             </View>
           </View>
@@ -448,7 +446,6 @@ export async function generateInvoicePdf(
             [invoice.customer.firstName, invoice.customer.lastName].filter(Boolean).join(' ')
           : null),
       matriculeFiscal: invoice.customerMatricule ?? invoice.customer?.matriculeFiscal ?? null,
-      cin: invoice.customer?.cin ?? null,
       address: invoice.customerAddress ?? invoice.customer?.address ?? null,
       city: invoice.customerCity ?? invoice.customer?.city ?? null,
     },
@@ -501,7 +498,6 @@ export async function generateQuotePdf(quoteId: string, options?: { withVat?: bo
     customer: {
       name: customerName,
       matriculeFiscal: quote.customer?.matriculeFiscal ?? null,
-      cin: quote.customer?.cin ?? null,
       address: quote.customer?.address ?? null,
       city: quote.customer?.city ?? null,
     },
@@ -550,7 +546,6 @@ export async function generateCreditNotePdf(creditNoteId: string): Promise<Buffe
           ? note.customer.companyName || [note.customer.firstName, note.customer.lastName].filter(Boolean).join(' ')
           : null),
       matriculeFiscal: note.customerMatricule ?? note.customer?.matriculeFiscal ?? null,
-      cin: note.customer?.cin ?? null,
       address: note.customerAddress ?? note.customer?.address ?? null,
       city: note.customerCity ?? note.customer?.city ?? null,
     },

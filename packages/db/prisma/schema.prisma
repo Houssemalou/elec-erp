@@ -484,7 +484,6 @@ model Customer {
   lastName        String?
   companyName     String?
   matriculeFiscal String? // Facultatif (renseigné manuellement dans l'ERP)
-  cin             String? // Carte d'identité nationale, saisie manuelle dans l'ERP
   email           String?
   phone           String?
   address         String? // Adresse libre (la ville fait partie de l'adresse)
@@ -781,7 +780,6 @@ model OnlineOrder {
   shippingAddress String
   shippingCity    String
   shippingPhone   String
-  cin             String? // CIN saisi dans l'ERP (le site vitrine ne le demande plus)
   shippingNote    String?
   shippingCost    Decimal              @db.Decimal(12, 3) @default(0)
   subtotalHT      Decimal              @db.Decimal(12, 3) @default(0)

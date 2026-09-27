@@ -17,7 +17,8 @@ import { createNotification } from './notification.service'
 //   - Si le client demande une facture → crée aussi une facture VALIDÉE
 //   - Décrémente le stock immédiatement
 //   - Enregistre le paiement (espèces ou carte)
-//   - Numérotation séquentielle BL-YYYY-###### (et POS-YYYY-###### si facture)
+//   - Numérotation séquentielle BL-YYYY-######, et FAC-YYYY-###### pour la
+//     facture : elle partage la série des factures classiques, avec ou sans TVA.
 // ============================================================================
 
 export interface PosSaleLine {
@@ -31,7 +32,6 @@ export interface ManualClientInfo {
   companyName?: string | null
   address?: string | null
   matriculeFiscal?: string | null
-  cin?: string | null
 }
 
 export interface CreatePosSaleInput {
@@ -103,7 +103,6 @@ export async function createPosSale(input: CreatePosSaleInput): Promise<PosSaleR
           companyName: mc.companyName || null,
           address: mc.address || null,
           matriculeFiscal: mc.matriculeFiscal || null,
-          cin: mc.cin || null,
         },
       })
       customerId = customer.id
@@ -148,8 +147,10 @@ export async function createPosSale(input: CreatePosSaleInput): Promise<PosSaleR
     let invoiceNumber: string | undefined
 
     // 6. Création de la facture (SI demandée)
+    // Même préfixe que les factures classiques : une seule série continue,
+    // que la vente soit assujettie à la TVA ou non.
     if (input.generateInvoice && customerId) {
-      const facNumber = await nextSequenceNumber('POS', currentYear(), tx)
+      const facNumber = await nextSequenceNumber('FAC', currentYear(), tx)
       const invoice = await tx.invoice.create({
         data: {
           number: facNumber,

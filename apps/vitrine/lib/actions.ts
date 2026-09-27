@@ -29,8 +29,6 @@ export async function createOrderAction(
 ): Promise<{ ok: boolean; orderId?: string; error?: string }> {
   const email = (input.email ?? '').trim().toLowerCase()
 
-  // Le CIN n'est plus demandé au client sur le site : il est renseigné
-  // manuellement dans l'ERP sur la fiche de la commande.
   const parsed = onlineOrderCreateSchema.safeParse({
     customerId: 'guest',
     shippingFullName: input.shippingFullName,
@@ -86,8 +84,6 @@ async function findOrCreateGuestCustomer(input: GuestCheckoutInput, email?: stri
     ? await prisma.customer.findFirst({ where: { OR: filters } })
     : null
   if (existing) {
-    // Le CIN n'est pas collecté ici : la valeur déjà présente est conservée,
-    // elle est complétée dans l'ERP.
     return prisma.customer.update({
       where: { id: existing.id },
       data: {

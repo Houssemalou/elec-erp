@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, XCircle, FileText, Pencil } from 'lucide-react'
+import { Loader2, XCircle, FileText } from 'lucide-react'
 import { Button, Input, Select, Label } from '@/components/ui'
 import { startActionLoader, stopActionLoader } from '@/lib/action-events'
 
@@ -217,94 +217,3 @@ export function StatusUpdater({
   )
 }
 
-/**
- * Saisie manuelle du CIN sur la fiche commande : le site vitrine ne le demande
- * plus au client, le magasin le note ici (retrait en magasin, contrôle à la
- * livraison) et il est automatiquement recopié sur la fiche client.
- */
-export function OrderCinField({
-  id,
-  cin,
-  action,
-}: {
-  id: string
-  cin: string | null
-  action: (id: string, cin: string) => Promise<{ success: boolean; error?: string }>
-}) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(cin ?? '')
-  const [error, setError] = useState<string>()
-  const [saved, setSaved] = useState(false)
-  const [pending, startTransition] = useTransition()
-  const router = useRouter()
-
-  const save = () => {
-    setError(undefined)
-    startActionLoader()
-    startTransition(async () => {
-      try {
-        const res = await action(id, value)
-        if (!res.success) {
-          setError(res.error ?? 'Erreur')
-          return
-        }
-        setEditing(false)
-        setSaved(true)
-        router.refresh()
-        setTimeout(() => setSaved(false), 3000)
-      } finally {
-        stopActionLoader()
-      }
-    })
-  }
-
-  if (!editing) {
-    return (
-      <div>
-        <p className="text-xs text-slate-400">CIN (carte d&apos;identité)</p>
-        <div className="mt-0.5 flex items-center gap-2">
-          <p className={`font-mono ${cin ? 'text-slate-900' : 'text-slate-400 italic'}`}>
-            {cin ?? 'Non renseigné'}
-          </p>
-          <button
-            type="button"
-            onClick={() => { setValue(cin ?? ''); setError(undefined); setEditing(true) }}
-            className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-accent-400"
-          >
-            <Pencil className="h-3 w-3" /> {cin ? 'Modifier' : 'Renseigner'}
-          </button>
-          {saved ? <span className="text-xs text-emerald-600">Enregistré</span> : null}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <Label>CIN (carte d&apos;identité)</Label>
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="N° de la carte d'identité"
-        inputMode="numeric"
-        maxLength={8}
-        autoFocus
-      />
-      {error ? <p className="mt-1 text-xs text-red-400">{error}</p> : null}
-      <div className="mt-2 flex gap-2">
-        <Button type="button" size="sm" onClick={save} disabled={pending || value.trim() === ''}>
-          {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null} Enregistrer
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={() => { setEditing(false); setError(undefined) }}
-          disabled={pending}
-        >
-          Annuler
-        </Button>
-      </div>
-    </div>
-  )
-}

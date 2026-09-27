@@ -27,7 +27,6 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
               lastName: customer.lastName,
               companyName: customer.companyName,
               matriculeFiscal: customer.matriculeFiscal,
-              cin: customer.cin,
               email: customer.email,
               phone: customer.phone,
               address: customer.address,

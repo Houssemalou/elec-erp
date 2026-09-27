@@ -6,7 +6,6 @@ export interface PartyData {
   lastName?: string | null
   companyName?: string | null
   matriculeFiscal?: string | null
-  cin?: string | null
   email?: string | null
   phone?: string | null
   address?: string | null
@@ -97,12 +96,6 @@ export function PartyFormFields({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {isClient ? (
-          <div>
-            <Label>CIN</Label>
-            <Input name="cin" defaultValue={data?.cin ?? ''} placeholder="Numéro de carte d'identité" />
-          </div>
-        ) : null}
         <div>
           <Label>Matricule fiscal</Label>
           <Input name="matriculeFiscal" defaultValue={data?.matriculeFiscal ?? ''} placeholder="1234567/A/M/000" />
