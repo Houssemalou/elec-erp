@@ -28,6 +28,8 @@ type Product = {
   sku: string
   name: string
   priceHT: number
+  /** Prix de revient HT (null si non renseigné sur la fiche produit). */
+  costPrice: number | null
   unit: string
   taxRate: number
   categoryName: string | null
@@ -39,6 +41,7 @@ type CartItem = {
   sku: string
   name: string
   priceHT: number
+  costPrice: number | null
   taxRate: number
   quantity: number
 }
@@ -50,6 +53,18 @@ type Customer = {
   companyName: string | null
   email: string | null
   phone: string | null
+}
+
+/** Quantité de stock lisible : 3 pour un entier, 3,500 pour du fractionnaire. */
+function formatStockQty(qty: number): string {
+  return Number.isInteger(qty)
+    ? qty.toLocaleString('fr-FR')
+    : qty.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+}
+
+/** Prix d'achat TTC = prix de revient HT + TVA. Null si le coût n'est pas renseigné. */
+function costTTC(costPrice: number | null, taxRate: number): number | null {
+  return costPrice === null ? null : costPrice * (1 + taxRate / 100)
 }
 
 type SuccessResult = {
@@ -139,33 +154,53 @@ export default function PosTerminal({
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 300)
   }, [])
 
-  const addToCart = useCallback((product: Product) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.productId === product.id)
-      if (existing) {
-        return prev.map((i) => (i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i))
+  const addToCart = useCallback(
+    (product: Product) => {
+      const inCart = cart.find((i) => i.productId === product.id)?.quantity ?? 0
+      const next = inCart + 1
+      if (next > product.stock) {
+        setError(`Stock insuffisant pour ${product.name} (disponible : ${formatStockQty(product.stock)})`)
+        return
       }
-      return [
-        ...prev,
-        {
-          productId: product.id,
-          sku: product.sku,
-          name: product.name,
-          priceHT: product.priceHT,
-          taxRate: product.taxRate,
-          quantity: 1,
-        },
-      ]
-    })
-  }, [])
+      setError(null)
+      setCart((prev) => {
+        const existing = prev.find((i) => i.productId === product.id)
+        if (existing) {
+          return prev.map((i) => (i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i))
+        }
+        return [
+          ...prev,
+          {
+            productId: product.id,
+            sku: product.sku,
+            name: product.name,
+            priceHT: product.priceHT,
+            costPrice: product.costPrice,
+            taxRate: product.taxRate,
+            quantity: 1,
+          },
+        ]
+      })
+    },
+    [cart],
+  )
 
-  const updateQty = useCallback((productId: string, qty: number) => {
-    setCart((prev) =>
-      qty <= 0
-        ? prev.filter((i) => i.productId !== productId)
-        : prev.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i)),
-    )
-  }, [])
+  const updateQty = useCallback(
+    (productId: string, qty: number) => {
+      if (qty <= 0) {
+        setCart((prev) => prev.filter((i) => i.productId !== productId))
+        return
+      }
+      const product = products.find((p) => p.id === productId)
+      if (product && qty > product.stock) {
+        setError(`Stock insuffisant pour ${product.name} (disponible : ${formatStockQty(product.stock)})`)
+        return
+      }
+      setError(null)
+      setCart((prev) => prev.map((i) => (i.productId === productId ? { ...i, quantity: qty } : i)))
+    },
+    [products],
+  )
 
   const removeFromCart = useCallback((productId: string) => {
     setCart((prev) => prev.filter((i) => i.productId !== productId))
@@ -183,6 +218,15 @@ export default function PosTerminal({
     return s + i.priceHT * i.quantity * ratio * (i.taxRate / 100)
   }, 0)
   const totalTTC = totalHTAfterDiscount + totalTVA
+
+  // Coût d'achat TTC et gain : servent à vérifier la marge au moment de la vente.
+  // Un article sans prix de revient sur sa fiche rend le total incomplet, on ne
+  // l'annonce donc pas plutôt que d'afficher un gain faux.
+  const missingCostCount = cart.filter((i) => i.costPrice === null).length
+  const hasFullCost = cart.length > 0 && missingCostCount === 0
+  const costTTCTotal = cart.reduce((s, i) => s + (costTTC(i.costPrice, i.taxRate) ?? 0) * i.quantity, 0)
+  const marginTotal = hasFullCost ? totalTTC - costTTCTotal : null
+  const marginRate = hasFullCost && totalTTC > 0 ? (marginTotal! / totalTTC) * 100 : null
 
   const handleSubmit = async () => {
     if (cart.length === 0) return
@@ -392,12 +436,29 @@ export default function PosTerminal({
                 className="flex flex-col items-start rounded-xl border border-[#2A2A2A] bg-[#151515] p-3 text-left transition-colors hover:border-accent-400/50 hover:bg-[#1A1A1A]"
               >
                 <span className="text-[10px] font-medium text-white/40">{p.sku}</span>
-                <span className="mt-0.5 line-clamp-2 text-sm font-semibold text-white">{p.name}</span>
+                <span className="mt-0.5 text-sm font-semibold leading-snug text-white">
+                  {p.name}{' '}
+                  <span
+                    className={`whitespace-nowrap font-medium ${
+                      p.stock <= 0 ? 'text-red-400' : p.stock <= 3 ? 'text-amber-400' : 'text-white/50'
+                    }`}
+                  >
+                    ({formatStockQty(p.stock)} dispo.)
+                  </span>
+                </span>
                 {p.categoryName ? (
                   <span className="mt-0.5 text-[10px] text-white/40">{p.categoryName}</span>
                 ) : null}
                 <span className="mt-auto pt-2 font-display text-base font-bold text-accent-400">
                   {money(p.priceHT * (1 + p.taxRate / 100))}
+                </span>
+                <span className="text-[11px] text-white/40">
+                  Achat TTC :{' '}
+                  {p.costPrice === null ? (
+                    <span className="text-white/25">non renseigné</span>
+                  ) : (
+                    money(p.costPrice * (1 + p.taxRate / 100))
+                  )}
                 </span>
               </button>
             ))}
@@ -467,7 +528,7 @@ export default function PosTerminal({
                   type="text"
                   value={manualMatricule}
                   onChange={(e) => setManualMatricule(e.target.value)}
-                  placeholder="Matricule fiscal *"
+                  placeholder="Matricule fiscal (optionnel)"
                   className="h-9 w-full rounded-lg border border-[#2A2A2A] bg-[#151515] px-3 text-sm text-white placeholder-white/30 focus:border-accent-400 focus:outline-none"
                 />
                 <div className="flex gap-2">
@@ -509,13 +570,27 @@ export default function PosTerminal({
             <ul className="space-y-2">
               {cart.map((item) => {
                 const lineTTC = item.priceHT * item.quantity * (1 + item.taxRate / 100)
+                const unitCostTTC = costTTC(item.costPrice, item.taxRate)
+                const available = products.find((p) => p.id === item.productId)?.stock ?? 0
                 return (
                   <li key={item.productId} className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-white truncate">{item.name}</p>
+                        <p className="text-sm font-semibold text-white">{item.name}</p>
                         <p className="text-[11px] text-white/40">
                           {money(item.priceHT * (1 + item.taxRate / 100))} &times; {item.quantity}
+                          <span className="text-white/30"> — stock : {formatStockQty(available)}</span>
+                        </p>
+                        <p className="text-[11px] text-white/40">
+                          Achat TTC :{' '}
+                          {unitCostTTC === null ? (
+                            <span className="text-white/25">non renseigné</span>
+                          ) : (
+                            <>
+                              {money(unitCostTTC)} &times; {item.quantity} ={' '}
+                              <span className="text-white/60">{money(unitCostTTC * item.quantity)}</span>
+                            </>
+                          )}
                         </p>
                       </div>
                       <button onClick={() => removeFromCart(item.productId)} className="text-white/30 hover:text-red-400">
@@ -533,7 +608,8 @@ export default function PosTerminal({
                         <span className="w-8 text-center text-sm font-medium text-white">{item.quantity}</span>
                         <button
                           onClick={() => updateQty(item.productId, item.quantity + 1)}
-                          className="px-2 py-1 text-white/50 hover:text-accent-400"
+                          disabled={item.quantity >= available}
+                          className="px-2 py-1 text-white/50 hover:text-accent-400 disabled:text-white/15 disabled:hover:text-white/15"
                         >
                           <Plus className="h-3 w-3" />
                         </button>
@@ -574,6 +650,30 @@ export default function PosTerminal({
               <span>Total TTC</span>
               <span>{money(totalTTC)}</span>
             </div>
+            {cart.length > 0 && (
+              <div className="mt-2 space-y-1 rounded-lg border border-[#2A2A2A] bg-[#151515] p-2.5 text-[11px]">
+                <div className="flex justify-between text-white/50">
+                  <span>Coût d&apos;achat TTC</span>
+                  <span>{hasFullCost ? money(costTTCTotal) : '—'}</span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span className="text-white/50">Gain</span>
+                  {marginTotal === null ? (
+                    <span className="text-white/30">—</span>
+                  ) : (
+                    <span className={marginTotal < 0 ? 'text-red-400' : 'text-emerald-400'}>
+                      {money(marginTotal)}
+                      {marginRate !== null ? ` (${marginRate.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %)` : ''}
+                    </span>
+                  )}
+                </div>
+                {!hasFullCost ? (
+                  <p className="text-white/30">
+                    Prix de revient non renseigné sur {missingCostCount} article(s) : le gain n&apos;est pas calculé.
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {/* Payment method */}

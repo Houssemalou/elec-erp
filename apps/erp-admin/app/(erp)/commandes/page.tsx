@@ -93,8 +93,16 @@ export default async function OrdersPage({
                   )}
                 </TD>
                 <TD className="text-xs">
-                  <Badge tone={o.paymentStatus === 'PAID' ? 'green' : 'amber'}>
-                    {o.paymentStatus === 'PAID' ? 'Payée' : 'En attente'}
+                  <Badge
+                    tone={
+                      o.paymentStatus === 'PAID' ? 'green' : o.paymentStatus === 'REFUNDED' ? 'red' : 'amber'
+                    }
+                  >
+                    {o.paymentStatus === 'PAID'
+                      ? 'Payée'
+                      : o.paymentStatus === 'REFUNDED'
+                        ? 'Remboursée'
+                        : 'En attente'}
                   </Badge>
                 </TD>
                 <TD className="text-right font-semibold">{money(o.totalTTC)}</TD>

@@ -32,10 +32,12 @@ import {
   cancelOrder,
   updateOrderStatus,
   markOrderPaid,
+  updateOrderCin,
   adjustStock,
   transferStock,
   runInventory,
   createPosSale,
+  cancelPosSale,
 } from '@elec/services'
 import { requireRole, ADMIN_ROLE, MANAGER_ROLES, STAFF_ROLES } from '@/lib/session'
 import { hash } from 'bcryptjs'
@@ -140,6 +142,22 @@ async function nextProductSku(preRef: string) {
 /** Retourne l'utilisateur courant si autorisé, sinon null. */
 function clean(users: Role[] = STAFF_ROLES) {
   return requireRole(users).then((r) => (r.allowed && r.session?.user ? r.session.user : null))
+}
+
+/**
+ * Rafraîchit toutes les vues concernées par une vente : après une annulation
+ * (ou une création) le stock, le chiffre d'affaires, l'historique des ventes en
+ * caisse, les factures et les commandes doivent tous afficher l'état à jour.
+ */
+function revalidateAfterSaleChange(extraPath?: string) {
+  revalidatePath('/pos')
+  revalidatePath('/ventes-caisse')
+  revalidatePath('/factures')
+  revalidatePath('/commandes')
+  revalidatePath('/stock')
+  revalidatePath('/dashboard')
+  revalidatePath('/finance')
+  if (extraPath) revalidatePath(extraPath)
 }
 
 // ============================================================================
@@ -474,7 +492,6 @@ export async function createCustomer(fd: FormData): Promise<ActionResult> {
       email: str(fd, 'email') || null,
       phone: str(fd, 'phone') || null,
       address: str(fd, 'address') || null,
-      city: str(fd, 'city') || null,
       notes: str(fd, 'notes') || null,
       active: check(fd, 'active'),
     },
@@ -502,7 +519,8 @@ export async function updateCustomer(id: string, fd: FormData): Promise<ActionRe
       email: str(fd, 'email') || null,
       phone: str(fd, 'phone') || null,
       address: str(fd, 'address') || null,
-      city: str(fd, 'city') || null,
+      // `city` n'est plus collecté dans l'ERP (un seul champ « Adresse ») :
+      // on ne l'écrase pas, la boutique en ligne le renseigne sur ses commandes.
       notes: str(fd, 'notes') || null,
       active: check(fd, 'active'),
     },
@@ -679,7 +697,6 @@ export async function createInvoiceAction(fd: FormData): Promise<ActionResult> {
   const customerName = str(fd, 'customerName') || null
   const customerMatricule = str(fd, 'customerMatricule') || null
   const customerAddress = str(fd, 'customerAddress') || null
-  const customerCity = str(fd, 'customerCity') || null
   const lines = parseLines(fd)
   if (lines.length === 0) return { success: false, error: 'Ajoutez au moins une ligne' }
 
@@ -690,7 +707,6 @@ export async function createInvoiceAction(fd: FormData): Promise<ActionResult> {
       customerName,
       customerMatricule,
       customerAddress,
-      customerCity,
       createdById: user.id,
       issueDate: str(fd, 'issueDate') || null,
       dueDate: str(fd, 'dueDate') || null,
@@ -725,8 +741,7 @@ export async function cancelInvoiceAction(id: string): Promise<ActionResult> {
   if (!user) return { success: false, error: 'Accès non autorisé' }
   try {
     await cancelInvoice(id, user.id)
-    revalidatePath('/factures')
-    revalidatePath(`/factures/${id}`)
+    revalidateAfterSaleChange(`/factures/${id}`)
     return { success: true, id }
   } catch (e) {
     return { success: false, error: (e as Error).message }
@@ -946,10 +961,8 @@ export async function cancelOrderAction(id: string, reason?: string): Promise<Ac
   const user = await clean(STAFF_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
   try {
-    await cancelOrder(id, reason)
-    revalidatePath('/commandes')
-    revalidatePath(`/commandes/${id}`)
-    revalidatePath('/stock')
+    await cancelOrder(id, user.id, reason)
+    revalidateAfterSaleChange(`/commandes/${id}`)
     return { success: true, id }
   } catch (e) {
     return { success: false, error: (e as Error).message }
@@ -959,19 +972,41 @@ export async function cancelOrderAction(id: string, reason?: string): Promise<Ac
 export async function updateOrderStatusAction(id: string, status: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
-  await updateOrderStatus(id, status as OnlineOrderStatus)
-  revalidatePath('/commandes')
-  revalidatePath(`/commandes/${id}`)
-  return { success: true }
+  try {
+    await updateOrderStatus(id, status as OnlineOrderStatus)
+    revalidateAfterSaleChange(`/commandes/${id}`)
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
 }
 
 export async function markOrderPaidAction(id: string, method: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
   if (!user) return { success: false, error: 'Accès non autorisé' }
-  await markOrderPaid(id, method as 'CARD' | 'EDAHABIA' | 'BANK_TRANSFER')
-  revalidatePath('/commandes')
-  revalidatePath(`/commandes/${id}`)
-  return { success: true }
+  try {
+    await markOrderPaid(id, method as 'CARD' | 'EDAHABIA' | 'BANK_TRANSFER')
+    revalidatePath('/commandes')
+    revalidatePath(`/commandes/${id}`)
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+/** Le CIN n'est plus demandé sur le site : le magasin le saisit sur la commande. */
+export async function updateOrderCinAction(id: string, cin: string): Promise<ActionResult> {
+  const user = await clean(STAFF_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await updateOrderCin(id, cin)
+    revalidatePath('/commandes')
+    revalidatePath(`/commandes/${id}`)
+    revalidatePath('/clients')
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
 }
 
 export async function createInvoiceFromOrderAction(id: string, fd?: FormData): Promise<ActionResult> {
@@ -1150,12 +1185,7 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
       globalDiscountValue: discountValue || null,
       notes: str(fd, 'notes') || null,
     })
-    revalidatePath('/pos')
-    revalidatePath('/ventes-caisse')
-    revalidatePath('/factures')
-    revalidatePath('/stock')
-    revalidatePath('/dashboard')
-    revalidatePath('/finance')
+    revalidateAfterSaleChange()
     return {
       success: true,
       id: sale.deliveryNoteId,
@@ -1164,6 +1194,23 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
       invoiceId: sale.invoiceId,
       invoiceNumber: sale.invoiceNumber,
     }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Annulation d'une vente en caisse depuis l'historique : le bon de livraison,
+ * la facture liée, le chiffre d'affaires et le stock reviennent à l'état
+ * antérieur. Réservée aux encadrants (le chiffre d'affaires est modifié).
+ */
+export async function cancelPosSaleAction(id: string, reason?: string): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    const result = await cancelPosSale(id, user.id, reason)
+    revalidateAfterSaleChange(`/ventes-caisse/${id}`)
+    return { success: true, id, invoiceId: result.sale.invoiceId ?? undefined }
   } catch (e) {
     return { success: false, error: (e as Error).message }
   }

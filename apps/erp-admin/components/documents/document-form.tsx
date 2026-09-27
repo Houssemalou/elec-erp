@@ -53,11 +53,10 @@ interface DocumentFormProps {
   /** Affiche un champ texte libre à la place du menu déroulant client. */
   partyFreeText?: boolean
   defaultPartyFreeText?: string
-  /** Champs libres additionnels client (matricule fiscal, adresse, ville) sous le nom. */
+  /** Champs libres additionnels client (matricule fiscal, adresse) sous le nom. */
   partyDetailsFields?: boolean
   defaultPartyMatricule?: string
   defaultPartyAddress?: string
-  defaultPartyCity?: string
   /** Affiche un bouton radio TVA (Avec / Sans) sur le devis. */
   showVatOption?: boolean
   defaultNonAssujettiTva?: boolean
@@ -92,7 +91,6 @@ export function DocumentForm({
   partyDetailsFields = false,
   defaultPartyMatricule = '',
   defaultPartyAddress = '',
-  defaultPartyCity = '',
   showVatOption = false,
   defaultNonAssujettiTva = false,
 }: DocumentFormProps) {
@@ -213,12 +211,8 @@ export function DocumentForm({
               {partyDetailsFields ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <Label>Matricule fiscal (si client commercial)</Label>
+                    <Label>Matricule fiscal (optionnel)</Label>
                     <Input name="customerMatricule" defaultValue={defaultPartyMatricule} placeholder="Optionnel" />
-                  </div>
-                  <div>
-                    <Label>Ville</Label>
-                    <Input name="customerCity" defaultValue={defaultPartyCity} placeholder="Optionnel" />
                   </div>
                   <div className="sm:col-span-2">
                     <Label>Adresse</Label>

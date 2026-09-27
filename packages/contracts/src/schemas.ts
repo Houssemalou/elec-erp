@@ -65,29 +65,24 @@ export const productSchema = z.object({
   imageUrls: z.array(z.string().url()).optional().default([]),
 })
 
-export const customerSchema = z
-  .object({
-    type: z.enum(['PARTICULIER', 'PROFESSIONNEL']),
-    firstName: z.string().optional().nullable(),
-    lastName: z.string().optional().nullable(),
-    companyName: z.string().optional().nullable(),
-    matriculeFiscal: z.string().optional().nullable(),
-    cin: z.string().optional().nullable(),
-    email: z.string().email().optional().or(z.literal('')).nullable(),
-    phone: z.string().optional().nullable(),
-    address: z.string().optional().nullable(),
-    city: z.string().optional().nullable(),
-    notes: z.string().optional().nullable(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.type === 'PROFESSIONNEL' && !data.matriculeFiscal) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['matriculeFiscal'],
-        message: 'Le matricule fiscal est obligatoire pour les clients professionnels',
-      })
-    }
-  })
+/**
+ * Le matricule fiscal et le CIN restent facultatifs : une facture peut être émise
+ * pour un client particulier, un prospect ou un client professionnel dont la
+ * fiche n'est pas encore complète.
+ */
+export const customerSchema = z.object({
+  type: z.enum(['PARTICULIER', 'PROFESSIONNEL']),
+  firstName: z.string().optional().nullable(),
+  lastName: z.string().optional().nullable(),
+  companyName: z.string().optional().nullable(),
+  matriculeFiscal: z.string().optional().nullable(),
+  cin: z.string().optional().nullable(),
+  email: z.string().email().optional().or(z.literal('')).nullable(),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
 
 export const supplierSchema = z.object({
   name: z.string().min(1),

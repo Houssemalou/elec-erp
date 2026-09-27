@@ -2,7 +2,13 @@ import { db, InvoiceStatus, InvoiceSource, DeliveryNoteSource, DeliveryNoteStatu
 import { calculateDocumentTotals, toDecimalString, type DocumentLineInput } from '@elec/contracts'
 import { currentYear, nextSequenceNumber, serializeVatBreakdown, getDefaultWarehouseId } from './helpers'
 import { buildLineRows } from './quote.service'
-import { decrementStockCore, StockMovementType } from './stock.service'
+import {
+  decrementStockCore,
+  reverseSalesForReferenceCore,
+  StockMovementType,
+  type ReverseSalesResult,
+} from './stock.service'
+import { cancelInvoiceCore } from './invoice.service'
 import { createNotification } from './notification.service'
 
 // ============================================================================
@@ -255,6 +261,75 @@ export async function createPosSale(input: CreatePosSaleInput): Promise<PosSaleR
       invoiceId,
       invoiceNumber,
     }
+  })
+}
+
+/**
+ * ANNULATION d'une vente en caisse — retour complet à l'état antérieur :
+ *   - le BL passe à CANCELLED ;
+ *   - la facture liée (si elle existe) est annulée : elle sort du chiffre
+ *     d'affaires, de l'encaissé et de la TVA ;
+ *   - le stock débité est réintégré (mouvements SALE de la référence de la
+ *     facture lorsqu'il y en a une, sinon ceux du BL). La réintégration est
+ *     faite une seule fois, la facture étant la source unique de la sortie
+ *     de stock d'une vente_POS avec facture.
+ */
+export async function cancelPosSale(id: string, userId: string, reason?: string | null) {
+  return db.$transaction(async (tx) => {
+    const sale = await tx.deliveryNote.findUnique({
+      where: { id },
+      include: { invoice: { select: { id: true, number: true, status: true } } },
+    })
+    if (!sale) throw new Error('Vente en caisse introuvable')
+    if (sale.source !== DeliveryNoteSource.POS) {
+      throw new Error('Ce bon de livraison ne provient pas d\'une vente en caisse')
+    }
+    if (sale.status === DeliveryNoteStatus.CANCELLED) {
+      throw new Error('Cette vente en caisse est déjà annulée')
+    }
+
+    const suffix = reason ? ` — ${reason}` : ''
+    let restored: ReverseSalesResult = { lines: 0, quantity: 0 }
+    let invoiceStatus: InvoiceStatus | null = null
+
+    if (sale.invoiceId && sale.invoice) {
+      const allowed: InvoiceStatus[] = [
+        InvoiceStatus.DRAFT,
+        InvoiceStatus.VALIDATED,
+        InvoiceStatus.PAID,
+        InvoiceStatus.PARTIALLY_PAID,
+      ]
+      if (allowed.includes(sale.invoice.status)) {
+        const result = await cancelInvoiceCore(tx, sale.invoice.id, userId)
+        restored = result.restored
+        invoiceStatus = result.invoice.status
+      } else {
+        invoiceStatus = sale.invoice.status
+      }
+    } else {
+      restored = await reverseSalesForReferenceCore(tx, {
+        reference: sale.number,
+        reason: `Annulation vente caisse ${sale.number}`,
+        userId,
+      })
+    }
+
+    const updated = await tx.deliveryNote.update({
+      where: { id },
+      data: {
+        status: DeliveryNoteStatus.CANCELLED,
+        notes: `${sale.notes ?? 'Vente en caisse'} — annulée${suffix}`,
+      },
+    })
+
+    await createNotification({
+      type: 'SYSTEM',
+      title: 'Vente en caisse annulée',
+      message: `Bon de livraison ${sale.number} annulé${sale.invoice ? ` et facture ${sale.invoice.number} annulée` : ''}${suffix} — ${Number(sale.totalTTC).toFixed(3)} DT retirés du chiffre d'affaires, ${restored.quantity.toFixed(3)} unité(s) réintégrée(s) en stock.`,
+      link: `/ventes-caisse/${sale.id}`,
+    })
+
+    return { sale: updated, invoiceStatus, restored }
   })
 }
 

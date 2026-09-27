@@ -5,17 +5,26 @@ import { db, InvoiceStatus, OnlineOrderStatus } from '@elec/db'
 // marge, commandes en attente)
 // ============================================================================
 
+const REVENUE_STATUSES = [
+  InvoiceStatus.VALIDATED,
+  InvoiceStatus.PAID,
+  InvoiceStatus.PARTIALLY_PAID,
+] as const
+
 export async function getDashboardKpis() {
   const [invoices, orders, stockAlerts, lowStockCount, topProducts] = await Promise.all([
     db.invoice.findMany({
-      where: { status: { in: [InvoiceStatus.VALIDATED, InvoiceStatus.PAID, InvoiceStatus.PARTIALLY_PAID] } },
+      where: { status: { in: [...REVENUE_STATUSES] } },
       include: { items: true },
     }),
     db.onlineOrder.findMany({ where: { status: { notIn: [OnlineOrderStatus.CANCELLED, OnlineOrderStatus.REFUNDED] } } }),
     db.stockLevel.findMany({ include: { product: true } }),
     db.stockLevel.count(),
+    // Uniquement les factures qui comptent réellement au chiffre d'affaires :
+    // une facture annulée ne doit plus apparaître dans les meilleures ventes.
     db.invoiceItem.groupBy({
       by: ['productId'],
+      where: { invoice: { status: { in: [...REVENUE_STATUSES] } } },
       _sum: { quantity: true, lineHT: true },
       orderBy: { _sum: { quantity: 'desc' } },
       take: 5,
@@ -88,7 +97,7 @@ export async function getDashboardKpis() {
 /** Marge moyenne pondérée sur les factures validées (si coût renseigné). */
 export async function getMarginKpi() {
   const invoices = await db.invoice.findMany({
-    where: { status: { in: [InvoiceStatus.VALIDATED, InvoiceStatus.PAID, InvoiceStatus.PARTIALLY_PAID] } },
+    where: { status: { in: [...REVENUE_STATUSES] } },
     include: { items: { include: { product: true } } },
   })
   let totalCost = 0

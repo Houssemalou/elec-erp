@@ -69,17 +69,19 @@ export default async function VentesCaissePage({
               <TH className="text-right">TVA</TH>
               <TH className="text-right">TTC</TH>
               <TH>Facture</TH>
+              <TH>Statut</TH>
               <TH className="text-right">Actions</TH>
             </TR>
           </THead>
           <tbody>
             {sales.map((sale) => {
               const pay = extractPayment(sale.notes)
+              const cancelled = sale.status === 'CANCELLED'
               const customerName = sale.customer
                 ? (sale.customer.companyName || [sale.customer.firstName, sale.customer.lastName].filter(Boolean).join(' ') || null)
                 : null
               return (
-                <TR key={sale.id}>
+                <TR key={sale.id} className={cancelled ? 'opacity-50' : undefined}>
                   <TD className="font-mono text-xs font-medium text-white/70">{sale.number}</TD>
                   <TD>{formatDate(sale.issueDate)}</TD>
                   <TD className="font-medium text-white">{customerName ?? <span className="text-white/40">—</span>}</TD>
@@ -88,7 +90,7 @@ export default async function VentesCaissePage({
                   </TD>
                   <TD className="text-right">{money(sale.totalHT)}</TD>
                   <TD className="text-right">{money(sale.totalTVA)}</TD>
-                  <TD className="text-right font-semibold">{money(sale.totalTTC)}</TD>
+                  <TD className="text-right font-semibold line-through decoration-white/30">{money(sale.totalTTC)}</TD>
                   <TD>
                     {sale.invoice ? (
                       <Link
@@ -100,6 +102,9 @@ export default async function VentesCaissePage({
                     ) : (
                       <span className="text-xs text-white/40">—</span>
                     )}
+                  </TD>
+                  <TD>
+                    <Badge tone={cancelled ? 'red' : 'green'}>{cancelled ? 'Annulée' : 'Validée'}</Badge>
                   </TD>
                   <TD className="text-right">
                     <Link
@@ -114,7 +119,7 @@ export default async function VentesCaissePage({
             })}
             {sales.length === 0 ? (
               <TR>
-                <TD colSpan={9} className="py-12 text-center text-white/40">Aucune vente en caisse</TD>
+                <TD colSpan={10} className="py-12 text-center text-white/40">Aucune vente en caisse</TD>
               </TR>
             ) : null}
           </tbody>

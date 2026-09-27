@@ -31,7 +31,6 @@ export function CheckoutForm({
     shippingAddress: '',
     shippingCity: '',
     shippingPhone: '',
-    cin: '',
     shippingNote: '',
     paymentMethod: 'COD',
     deliveryMethod: 'DELIVERY',
@@ -111,7 +110,6 @@ export function CheckoutForm({
         shippingAddress: form.shippingAddress,
         shippingCity: form.shippingCity,
         shippingPhone: form.shippingPhone,
-        cin: form.cin,
         shippingNote: form.shippingNote || null,
         shippingCost: shippingCostServer,
         paymentMethod: 'COD',
@@ -205,20 +203,6 @@ export function CheckoutForm({
                 <input required type="email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="vous@exemple.tn" />
               </div>
             ) : null}
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">CIN (carte d&apos;identité)</label>
-              <input
-                required={mode === 'order'}
-                className={inputCls}
-                value={form.cin}
-                onChange={(e) => setForm({ ...form, cin: e.target.value })}
-                placeholder="N° de la carte d'identité"
-                inputMode="numeric"
-                maxLength={8}
-                pattern="[0-9]{8}"
-                title="Le CIN doit contenir 8 chiffres"
-              />
-            </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Téléphone</label>
               <input required className={inputCls} value={form.shippingPhone} onChange={(e) => setForm({ ...form, shippingPhone: e.target.value })} placeholder="+216 …" />

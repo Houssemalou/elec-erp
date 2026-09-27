@@ -1,7 +1,15 @@
-import { db, OnlineOrderStatus, OnlinePaymentStatus, Prisma } from '@elec/db'
+import { db, InvoiceStatus, OnlineOrderStatus, OnlinePaymentStatus, Prisma } from '@elec/db'
 import { calculateDocumentTotals, roundMoney, toDecimalString, type DocumentLineInput } from '@elec/contracts'
 import { currentYear, nextSequenceNumber, serializeVatBreakdown, getDefaultWarehouseId } from './helpers'
-import { reserveStockCore, sellReservedCore, releaseReservedCore, StockMovementType } from './stock.service'
+import {
+  reserveStockCore,
+  sellReservedCore,
+  releaseReservedClampedCore,
+  reverseSalesForReferenceCore,
+  StockMovementType,
+  type ReverseSalesResult,
+} from './stock.service'
+import { cancelInvoiceCore } from './invoice.service'
 import { createNotification } from './notification.service'
 import { sendOrderEmail } from './mail.service'
 
@@ -102,6 +110,12 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
 
     const totals = await computeOrderTotals(lines, shippingCost, withInvoice)
 
+    // Le site ne demande plus le CIN : on reprend celui déjà connu du client,
+    // sinon le magasin le saisit sur la fiche de la commande.
+    const customerCin = await tx.customer
+      .findUnique({ where: { id: input.customerId }, select: { cin: true } })
+      .then((c) => c?.cin ?? null)
+
     const order = await tx.onlineOrder.create({
       data: {
         number,
@@ -115,6 +129,7 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
         shippingAddress: input.shippingAddress,
         shippingCity: input.shippingCity,
         shippingPhone: input.shippingPhone,
+        cin: customerCin,
         shippingNote: input.shippingNote ?? null,
         shippingCost: toDecimalString(shippingCost),
         subtotalHT: toDecimalString(totals.subtotalHT),
@@ -200,41 +215,156 @@ export async function confirmOrder(id: string) {
   })
 }
 
-export async function cancelOrder(id: string, reason?: string | null) {
+/**
+ * ANNULATION d'une commande — retour complet à l'état antérieur :
+ *   - si le stock avait déjà été DÉBITÉ (commande confirmée) : les quantités
+ *     réellement sorties sont réintégrées ;
+ *   - si le stock était encore RÉSERVÉ (commande en attente) : la réservation
+ *     est libérée, sans jamais faire de négatif ;
+ *   - la facture liée est annulée si elle existe (elle sort alors du chiffre
+ *     d'affaires) ;
+ *   - un paiement déjà encaissé passe en REMBOURSÉ ;
+ *   - le motif est journalisé dans les notes de la commande.
+ */
+export async function cancelOrder(id: string, userId: string | null, reason?: string | null) {
   const warehouseId = await getDefaultWarehouseId()
   return db.$transaction(async (tx) => {
     const order = await tx.onlineOrder.findUnique({ where: { id }, include: { items: true } })
     if (!order) throw new Error('Commande introuvable')
-    const locked: OnlineOrderStatus[] = [OnlineOrderStatus.DELIVERED, OnlineOrderStatus.CANCELLED, OnlineOrderStatus.REFUNDED]
+    const locked: OnlineOrderStatus[] = [
+      OnlineOrderStatus.DELIVERED,
+      OnlineOrderStatus.CANCELLED,
+      OnlineOrderStatus.REFUNDED,
+    ]
     if (locked.includes(order.status)) {
       throw new Error('La commande ne peut plus être annulée')
     }
 
-    for (const item of order.items) {
-      await releaseReservedCore(tx, {
-        productId: item.productId,
-        warehouseId,
-        quantity: Number(item.quantity),
-        type: StockMovementType.RELEASE,
+    const suffix = reason ? ` — ${reason}` : ''
+
+    // Le stock a-t-il déjà été débité pour cette commande ?
+    // On se base sur les mouvements réels plutôt que sur le statut, pour rester
+    // exact même si le statut a été modifié manuellement.
+    const sold = await tx.stockMovement.findFirst({
+      where: { reference: order.number, type: StockMovementType.SALE, quantity: { lt: 0 } },
+      select: { id: true },
+    })
+
+    let restored: ReverseSalesResult = { lines: 0, quantity: 0 }
+    let released = 0
+
+    if (sold) {
+      restored = await reverseSalesForReferenceCore(tx, {
         reference: order.number,
-        reason: `Annulation commande ${order.number}${reason ? ` — ${reason}` : ''}`,
-        userId: null,
+        reason: `Annulation commande ${order.number}${suffix}`,
+        userId,
       })
+    } else {
+      for (const item of order.items) {
+        released += await releaseReservedClampedCore(tx, {
+          productId: item.productId,
+          warehouseId,
+          quantity: Number(item.quantity),
+          type: StockMovementType.RELEASE,
+          reference: order.number,
+          reason: `Annulation commande ${order.number}${suffix}`,
+          userId: null,
+        })
+      }
     }
 
-    return tx.onlineOrder.update({ where: { id }, data: { status: OnlineOrderStatus.CANCELLED } })
+    // Facture issue de la commande : annulée pour sortir du chiffre d'affaires.
+    const invoice = await tx.invoice.findFirst({
+      where: { notes: { contains: order.number } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (invoice) {
+      const cancellable: InvoiceStatus[] = [
+        InvoiceStatus.DRAFT,
+        InvoiceStatus.VALIDATED,
+        InvoiceStatus.PAID,
+        InvoiceStatus.PARTIALLY_PAID,
+      ]
+      if (cancellable.includes(invoice.status)) {
+        const result = await cancelInvoiceCore(tx, invoice.id, userId)
+        restored.quantity += result.restored.quantity
+        restored.lines += result.restored.lines
+      }
+    }
+
+    const updated = await tx.onlineOrder.update({
+      where: { id },
+      data: {
+        status: OnlineOrderStatus.CANCELLED,
+        paymentStatus:
+          order.paymentStatus === OnlinePaymentStatus.PAID
+            ? OnlinePaymentStatus.REFUNDED
+            : order.paymentStatus,
+        notes: order.notes ? `${order.notes}${suffix}` : `Annulée${suffix}`,
+      },
+    })
+
+    await createNotification({
+      type: 'SYSTEM',
+      title: 'Commande annulée',
+      message: `Commande ${order.number} annulée${suffix} — ${Number(order.totalTTC).toFixed(3)} DT retirés, ${restored.quantity.toFixed(3)} unité(s) réintégrée(s) en stock, ${released.toFixed(3)} unité(s) de réservation libérée(s).`,
+      link: `/commandes/${order.id}`,
+    })
+
+    return updated
   })
 }
 
+/**
+ * Changement de statut « logistique » (préparation, expédition, livraison).
+ * Les statuts Annulée / Remboursée passent obligatoirement par `cancelOrder`
+ * afin que le stock, le chiffre d'affaires et les paiements soient restitués.
+ */
 export async function updateOrderStatus(id: string, status: OnlineOrderStatus) {
-  const order = await db.onlineOrder.update({ where: { id }, data: { status } })
-  return order
+  if (status === OnlineOrderStatus.CANCELLED || status === OnlineOrderStatus.REFUNDED) {
+    throw new Error(
+      'Utilisez « Annuler la commande » : le stock, le chiffre d\'affaire et les paiements sont alors automatiquement restitués.',
+    )
+  }
+  const order = await db.onlineOrder.findUnique({ where: { id }, select: { status: true } })
+  if (!order) throw new Error('Commande introuvable')
+  if (order.status === OnlineOrderStatus.CANCELLED || order.status === OnlineOrderStatus.REFUNDED) {
+    throw new Error('Une commande annulée ou remboursée ne peut plus changer de statut')
+  }
+  const updated = await db.onlineOrder.update({ where: { id }, data: { status } })
+  return updated
 }
 
 export async function markOrderPaid(id: string, method: 'CARD' | 'EDAHABIA' | 'BANK_TRANSFER' = 'CARD') {
   return db.onlineOrder.update({
     where: { id },
     data: { paymentStatus: OnlinePaymentStatus.PAID, paymentMethod: method },
+  })
+}
+
+/**
+ * Renseigne le numéro de carte d'identité du client. Le site vitrine ne le
+ * demande plus : c'est le magasin qui le saisit ici, une fois la commande
+ * reçue (retrait en magasin ou contrôle à la livraison).
+ * Le CIN est aussi recopié sur la fiche client lorsqu'elle est encore vide,
+ * pour qu'il apparaisse sur les factures et bons de livraison du dossier.
+ */
+export async function updateOrderCin(id: string, cin: string | null) {
+  const value = cin && cin.trim() !== '' ? cin.trim() : null
+  return db.$transaction(async (tx) => {
+    const order = await tx.onlineOrder.findUnique({ where: { id }, select: { id: true, customerId: true } })
+    if (!order) throw new Error('Commande introuvable')
+
+    const updated = await tx.onlineOrder.update({ where: { id }, data: { cin: value } })
+
+    if (value) {
+      await tx.customer.updateMany({
+        where: { id: order.customerId, cin: null },
+        data: { cin: value },
+      })
+    }
+
+    return updated
   })
 }
 

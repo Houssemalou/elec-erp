@@ -29,6 +29,7 @@ export default async function PosPage() {
     sku: p.sku,
     name: p.name,
     priceHT: Number(p.priceHT),
+    costPrice: p.costPrice === null ? null : Number(p.costPrice),
     unit: p.unit,
     taxRate: Number(p.taxRate.rate),
     categoryName: p.category?.name ?? null,

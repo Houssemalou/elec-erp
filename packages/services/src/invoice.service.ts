@@ -1,13 +1,18 @@
-import { db, InvoiceStatus, Prisma } from '@elec/db'
+import { db, DeliveryNoteStatus, InvoiceStatus, Prisma } from '@elec/db'
 import {
   calculateDocumentTotals,
   roundMoney,
   toDecimalString,
   type DocumentLineInput,
 } from '@elec/contracts'
-import { currentYear, nextSequenceNumber, serializeVatBreakdown } from './helpers'
+import { currentYear, nextSequenceNumber, serializeVatBreakdown, type DbClient } from './helpers'
 import { buildLineRows } from './quote.service'
-import { decrementStockCore, incrementStockCore, StockMovementType } from './stock.service'
+import {
+  decrementStockCore,
+  incrementStockCore,
+  reverseSalesForReferenceCore,
+  StockMovementType,
+} from './stock.service'
 import { createNotification } from './notification.service'
 
 // ============================================================================
@@ -92,10 +97,30 @@ export async function createInvoice(input: {
   })
 }
 
+/** N° de commande en ligne à l'origine d'une facture ("Facture issue de la commande en ligne OC-…"). */
+function extractOnlineOrderNumber(notes: string | null): string | null {
+  if (!notes) return null
+  return notes.match(/commande en ligne (OC-\d{4}-\d{6})/)?.[1] ?? null
+}
+
+/** Le stock de cette référence a-t-il déjà été débité par une vente ? */
+async function hasSalesForReference(client: DbClient, reference: string): Promise<boolean> {
+  const movement = await client.stockMovement.findFirst({
+    where: { reference, type: StockMovementType.SALE, quantity: { lt: 0 } },
+    select: { id: true },
+  })
+  return movement !== null
+}
+
 /**
  * VALIDATION d'une facture (brouillon → validée) :
  *   - décrémente le stock (SALE, référence = n° facture)
  *   - verrouille le numéro (non modifiable ensuite)
+ *
+ * Cas particulier : une facture émise depuis une commande en ligne déjà
+ * confirmée. La sortie de stock a été faite à la confirmation de la commande ;
+ * on ne la refait pas ici, sinon le stock serait débité deux fois et son
+ * annulation ne pourrait pas revenir à l'état précédent.
  */
 export async function validateInvoice(id: string, userId: string, warehouseId?: string) {
   return db.$transaction(async (tx) => {
@@ -107,23 +132,30 @@ export async function validateInvoice(id: string, userId: string, warehouseId?: 
     if (invoice.status !== InvoiceStatus.DRAFT) {
       throw new Error('Seule une facture brouillon peut être validée')
     }
-    const wId =
-      warehouseId ??
-      (await tx.warehouse.findFirst({ where: { isDefault: true } }))?.id ??
-      (await tx.warehouse.findFirst())?.id
-    if (!wId) throw new Error('Aucun dépôt configuré')
 
-    for (const item of invoice.items) {
-      if (item.productId) {
-        await decrementStockCore(tx, {
-          productId: item.productId,
-          warehouseId: wId,
-          quantity: Number(item.quantity),
-          type: StockMovementType.SALE,
-          reference: invoice.number,
-          reason: `Facture ${invoice.number}`,
-          userId,
-        })
+    const orderNumber = extractOnlineOrderNumber(invoice.notes)
+    const alreadySoldByOrder =
+      orderNumber !== null && (await hasSalesForReference(tx, orderNumber))
+
+    if (!alreadySoldByOrder) {
+      const wId =
+        warehouseId ??
+        (await tx.warehouse.findFirst({ where: { isDefault: true } }))?.id ??
+        (await tx.warehouse.findFirst())?.id
+      if (!wId) throw new Error('Aucun dépôt configuré')
+
+      for (const item of invoice.items) {
+        if (item.productId) {
+          await decrementStockCore(tx, {
+            productId: item.productId,
+            warehouseId: wId,
+            quantity: Number(item.quantity),
+            type: StockMovementType.SALE,
+            reference: invoice.number,
+            reason: `Facture ${invoice.number}`,
+            userId,
+          })
+        }
       }
     }
 
@@ -135,15 +167,63 @@ export async function validateInvoice(id: string, userId: string, warehouseId?: 
   })
 }
 
+/**
+ * ANNULATION d'une facture — retour complet à l'état antérieur :
+ *   - le stock débité à la validation est réintégré (mouvements SALE de la
+ *     facture, dépôt par dépôt) ;
+ *   - les bons de livraison rattachés (ventes en caisse) passent à CANCELLED ;
+ *   - le statut passe à CANCELLED, ce qui retire la facture du chiffre
+ *     d'affaires, de l'encaissé, de la TVA et des créances.
+ * Une facture DRAFT n'ayant jamais débité de stock, rien n'est réintégré.
+ */
+export async function cancelInvoiceCore(client: DbClient, id: string, userId: string | null) {
+  const invoice = await client.invoice.findUnique({
+    where: { id },
+    include: { deliveryNotes: { select: { id: true } } },
+  })
+  if (!invoice) throw new Error('Facture introuvable')
+  const allowed: InvoiceStatus[] = [
+    InvoiceStatus.DRAFT,
+    InvoiceStatus.VALIDATED,
+    InvoiceStatus.PAID,
+    InvoiceStatus.PARTIALLY_PAID,
+  ]
+  if (!allowed.includes(invoice.status)) {
+    throw new Error('Cette facture ne peut pas être annulée')
+  }
+
+  const restored = await reverseSalesForReferenceCore(client, {
+    reference: invoice.number,
+    reason: `Annulation facture ${invoice.number}`,
+    userId,
+  })
+
+  if (invoice.deliveryNotes.length > 0) {
+    await client.deliveryNote.updateMany({
+      where: { id: { in: invoice.deliveryNotes.map((d) => d.id) } },
+      data: { status: DeliveryNoteStatus.CANCELLED },
+    })
+  }
+
+  const updated = await client.invoice.update({
+    where: { id },
+    data: { status: InvoiceStatus.CANCELLED },
+  })
+
+  await createNotification({
+    type: 'SYSTEM',
+    title: 'Facture annulée',
+    message: `Facture ${invoice.number} annulée — ${Number(invoice.totalTTC).toFixed(3)} DT retirés du chiffre d'affaires, ${restored.quantity.toFixed(3)} unité(s) réintégrée(s) en stock.`,
+    link: `/factures/${invoice.id}`,
+  })
+
+  return { invoice: updated, restored }
+}
+
 export async function cancelInvoice(id: string, userId: string) {
   return db.$transaction(async (tx) => {
-    const invoice = await tx.invoice.findUnique({ where: { id } })
-    if (!invoice) throw new Error('Facture introuvable')
-    const allowed: InvoiceStatus[] = [InvoiceStatus.DRAFT, InvoiceStatus.VALIDATED]
-    if (!allowed.includes(invoice.status)) {
-      throw new Error('Cette facture ne peut pas être annulée')
-    }
-    return tx.invoice.update({ where: { id }, data: { status: InvoiceStatus.CANCELLED } })
+    const { invoice } = await cancelInvoiceCore(tx, id, userId)
+    return invoice
   })
 }
 

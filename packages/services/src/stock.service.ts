@@ -153,6 +153,116 @@ export async function releaseReservedStock(input: StockOpInput) {
 }
 
 /**
+ * Libération « au mieux » d'une réservation : ne descend jamais la quantité
+ * réservée en négatif (elle est plafonnée à ce qui est réellement réservé).
+ * Utilisée lors des annulations, où la réservation a pu être déjà consommée
+ * ou corrigée par un inventaire : l'annulation ne doit jamais échouer.
+ */
+export async function releaseReservedClampedCore(client: DbClient, input: StockOpInput) {
+  if (input.quantity <= 0) throw new StockError('La quantité doit être positive')
+  const level = await getOrCreateStockLevel(client, input.productId, input.warehouseId)
+  const releasable = Math.min(input.quantity, Number(level.reservedQuantity))
+  if (releasable <= 0) return 0
+  await client.stockLevel.update({
+    where: { id: level.id },
+    data: { reservedQuantity: { decrement: releasable } },
+  })
+  await client.stockMovement.create({
+    data: {
+      type: StockMovementType.RELEASE,
+      productId: input.productId,
+      warehouseId: input.warehouseId,
+      quantity: 0,
+      reason: input.reason ?? `Libération de ${releasable}`,
+      reference: input.reference ?? null,
+      userId: input.userId ?? null,
+    },
+  })
+  return releasable
+}
+
+// ---------------------------------------------------------------------------
+// Annulation d'une vente — réintégration du stock
+// ---------------------------------------------------------------------------
+
+export interface ReverseSalesInput {
+  /**
+   * Référence portée par les mouvements de sortie (n° facture, n° BL, n° commande).
+   * Seules les sorties réelles enregistrées sous cette référence sont annulées :
+   * le stock revient donc exactement à son état précédent, dépôt par dépôt.
+   *
+   * ATTENTION : l'appelant DOIT garantir qu'il n'appelle qu'une fois par
+   * document. Les mouvements SALE d'origine ne sont pas consommés (la
+   * réintégration est journalisée en RETURN), donc un second appel
+   * réintégrerait à nouveau les mêmes quantités. Toutes les annulations de
+   * l'application sont protégées par un contrôle de statut
+   * (`cancelInvoiceCore`, `cancelPosSale`, `cancelOrder`).
+   */
+  reference: string
+  reason: string
+  userId?: string | null
+}
+
+export interface ReverseSalesResult {
+  /** Nombre de couples produit/dépôt réintégrés. */
+  lines: number
+  /** Quantité totale réintégrée. */
+  quantity: number
+}
+
+/**
+ * Annule l'effet des ventes d'une référence : chaque quantité réellement sortie
+ * (mouvements SALE négatifs) est remise en stock et journalisée en RETURN.
+ * Aucun mouvement n'est créé si la référence n'a jamais enregistré de sortie
+ * de stock (facture annulée avant validation, commande en attente, etc.).
+ */
+export async function reverseSalesForReferenceCore(
+  client: DbClient,
+  input: ReverseSalesInput,
+): Promise<ReverseSalesResult> {
+  const movements = await client.stockMovement.groupBy({
+    by: ['productId', 'warehouseId'],
+    where: {
+      reference: input.reference,
+      type: StockMovementType.SALE,
+      quantity: { lt: 0 },
+    },
+    _sum: { quantity: true },
+  })
+
+  let quantity = 0
+  for (const m of movements) {
+    const qty = Math.abs(Number(m._sum.quantity ?? 0))
+    if (qty <= 0) continue
+    const level = await getOrCreateStockLevel(client, m.productId, m.warehouseId)
+    await client.stockLevel.update({
+      where: { id: level.id },
+      data: { quantity: { increment: qty } },
+    })
+    await client.stockMovement.create({
+      data: {
+        type: StockMovementType.RETURN,
+        productId: m.productId,
+        warehouseId: m.warehouseId,
+        quantity: qty,
+        reason: input.reason,
+        reference: input.reference,
+        userId: input.userId ?? null,
+      },
+    })
+    quantity += qty
+  }
+
+  return { lines: movements.length, quantity }
+}
+
+export async function reverseSalesForReference(input: ReverseSalesInput): Promise<ReverseSalesResult> {
+  const result = await db.$transaction((tx) => reverseSalesForReferenceCore(tx, input))
+  await checkAndNotifyStockAlerts()
+  return result
+}
+
+/**
  * Vente d'une quantité réservée (confirmation de commande en ligne) :
  * la réservation est consommée ET le stock physique décrémenté.
  */

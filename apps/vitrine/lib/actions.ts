@@ -15,7 +15,6 @@ export type GuestCheckoutInput = {
   shippingAddress?: string
   shippingCity?: string
   shippingPhone: string
-  cin?: string
   shippingNote?: string | null
   shippingCost?: number
   paymentMethod: 'COD'
@@ -29,9 +28,9 @@ export async function createOrderAction(
   input: GuestCheckoutInput,
 ): Promise<{ ok: boolean; orderId?: string; error?: string }> {
   const email = (input.email ?? '').trim().toLowerCase()
-  const cin = (input.cin ?? '').trim()
-  if (!cin) return { ok: false, error: 'Le numéro de carte d\'identité (CIN) est obligatoire.' }
 
+  // Le CIN n'est plus demandé au client sur le site : il est renseigné
+  // manuellement dans l'ERP sur la fiche de la commande.
   const parsed = onlineOrderCreateSchema.safeParse({
     customerId: 'guest',
     shippingFullName: input.shippingFullName,
@@ -82,18 +81,18 @@ async function findOrCreateGuestCustomer(input: GuestCheckoutInput, email?: stri
   const filters: Array<Record<string, string>> = []
   if (email) filters.push({ email })
   if (input.shippingPhone) filters.push({ phone: input.shippingPhone })
-  if (input.cin) filters.push({ cin: input.cin })
 
   const existing = filters.length
     ? await prisma.customer.findFirst({ where: { OR: filters } })
     : null
   if (existing) {
+    // Le CIN n'est pas collecté ici : la valeur déjà présente est conservée,
+    // elle est complétée dans l'ERP.
     return prisma.customer.update({
       where: { id: existing.id },
       data: {
         email: email || existing.email,
         phone: input.shippingPhone || existing.phone,
-        cin: input.cin || existing.cin,
         address: input.shippingAddress || existing.address,
         city: input.shippingCity || existing.city,
       },
@@ -106,7 +105,6 @@ async function findOrCreateGuestCustomer(input: GuestCheckoutInput, email?: stri
       firstName,
       lastName,
       email: email || null,
-      cin: input.cin || null,
       phone: input.shippingPhone || null,
       address: input.shippingAddress || null,
       city: input.shippingCity || null,

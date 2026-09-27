@@ -78,16 +78,23 @@ export function PartyFormFields({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {isClient ? (
         <div>
           <Label>Adresse</Label>
           <Input name="address" defaultValue={data?.address ?? ''} />
         </div>
-        <div>
-          <Label>Ville</Label>
-          <Input name="city" defaultValue={data?.city ?? ''} />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>Adresse</Label>
+            <Input name="address" defaultValue={data?.address ?? ''} />
+          </div>
+          <div>
+            <Label>Ville</Label>
+            <Input name="city" defaultValue={data?.city ?? ''} />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {isClient ? (

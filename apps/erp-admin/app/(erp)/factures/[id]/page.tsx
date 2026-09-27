@@ -96,10 +96,6 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 <p className="font-mono text-white/70">{invoice.customer?.cin ?? '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-white/40">Ville</p>
-                <p className="font-mono text-white/70">{invoice.customerCity ?? invoice.customer?.city ?? '—'}</p>
-              </div>
-              <div>
                 <p className="text-xs text-white/40">Adresse</p>
                 <p>{invoice.customerAddress ?? invoice.customer?.address ?? '—'}</p>
               </div>
@@ -201,8 +197,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   <ActionButton action={cancelInvoiceAction.bind(null, id)} label="Annuler la facture" variant="danger" confirm="Annuler cette facture ?" />
                 </>
               ) : null}
-              {invoice.status === 'VALIDATED' ? (
-                <ActionButton action={cancelInvoiceAction.bind(null, id)} label="Annuler la facture" variant="danger" confirm="Annuler cette facture ?" />
+              {['VALIDATED', 'PAID', 'PARTIALLY_PAID'].includes(invoice.status) ? (
+                <ActionButton
+                  action={cancelInvoiceAction.bind(null, id)}
+                  label="Annuler la facture"
+                  variant="danger"
+                  confirmTitle="Annuler cette facture ?"
+                  confirm="Le montant sera retiré du chiffre d'affaires, de l'encaissé et de la TVA, et le stock des articles sera réintégré. Cette action est définitive."
+                />
               ) : null}
               {['VALIDATED', 'PAID', 'PARTIALLY_PAID'].includes(invoice.status) && invoice.status !== 'CREDITED' ? (
                 <Link href={`/avoirs/nouveau?invoice=${invoice.id}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 text-sm font-medium text-white/70 hover:bg-[#1A1A1A]">

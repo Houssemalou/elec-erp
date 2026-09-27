@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@elec/db'
 import { PageHeader, Card, Badge, Table, THead, TR, TH, TD } from '@/components/ui'
+import { CancelSaleButton } from '@/components/pos/cancel-sale-button'
+import { cancelPosSaleAction } from '@/lib/actions/erp'
 import { money, formatDate } from '@/lib/utils'
 import { ArrowLeft } from 'lucide-react'
 
@@ -31,6 +33,8 @@ export default async function VenteCaisseDetailPage({
     : null
 
   const payment = sale.notes?.includes('Carte') ? 'Carte' : sale.notes?.includes('Espèces') ? 'Espèces' : '—'
+  const isCancelled = sale.status === 'CANCELLED'
+  const invoiceCancelled = sale.invoice?.status === 'CANCELLED'
 
   return (
     <div>
@@ -38,11 +42,23 @@ export default async function VenteCaisseDetailPage({
         title={`Vente caisse ${sale.number}`}
         description={`Bon de livraison du ${formatDate(sale.issueDate)}`}
         actions={
-          <Link href="/ventes-caisse" className="inline-flex items-center gap-1.5 rounded-lg border border-[#2A2A2A] px-3 py-2 text-sm text-white/60 hover:bg-white/5">
-            <ArrowLeft className="h-4 w-4" /> Retour
-          </Link>
+          <div className="flex items-center gap-2">
+            {isCancelled ? null : (
+              <CancelSaleButton id={sale.id} action={cancelPosSaleAction} hasInvoice={Boolean(sale.invoice)} />
+            )}
+            <Link href="/ventes-caisse" className="inline-flex items-center gap-1.5 rounded-lg border border-[#2A2A2A] px-3 py-2 text-sm text-white/60 hover:bg-white/5">
+              <ArrowLeft className="h-4 w-4" /> Retour
+            </Link>
+          </div>
         }
       />
+
+      {isCancelled ? (
+        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          Cette vente en caisse est annulée : elle n&apos;est plus comptée dans le chiffre d&apos;affaires et le
+          stock des articles concerned a été réintégré.
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -106,9 +122,19 @@ export default async function VenteCaisseDetailPage({
                 </div>
                 <div className="flex justify-between"><span className="text-white/60">Montant facturé</span><span className="font-medium text-white">{money(sale.invoice.totalTTC)}</span></div>
                 <div className="flex justify-between"><span className="text-white/60">Payé</span><span className="font-medium text-white">{money(sale.invoice.paidAmount)}</span></div>
-                <div className="flex justify-between"><span className="text-white/60">Statut facture</span>
-                  <Badge tone={sale.invoice.status === 'VALIDATED' ? 'green' : 'amber'}>{sale.invoice.status}</Badge>
-                </div>
+              <div className="flex justify-between"><span className="text-white/60">Statut facture</span>
+                <Badge
+                  tone={
+                    invoiceCancelled
+                      ? 'red'
+                      : sale.invoice.status === 'VALIDATED' || sale.invoice.status === 'PAID'
+                        ? 'green'
+                        : 'amber'
+                  }
+                >
+                  {invoiceCancelled ? 'ANNULÉE' : sale.invoice.status}
+                </Badge>
+              </div>
               </div>
             </Card>
           )}
