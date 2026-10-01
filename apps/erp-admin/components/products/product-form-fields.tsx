@@ -27,14 +27,19 @@ export interface ProductFormFieldsProps {
 }
 
 function roundPrice(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1000) / 1000
+  return Math.round((value + Number.EPSILON) * 10) / 10
+}
+
+/** Un seul chiffre après la virgule, sans zéro inutile : 3.5, 2.2, 3. */
+function formatPrice(value: number): string {
+  return String(roundPrice(value))
 }
 
 function calculatePriceTTC(priceHT: string, rate: number | undefined): string {
   if (!priceHT.trim() || rate === undefined || !Number.isFinite(rate)) return ''
   const value = Number(priceHT)
   if (!Number.isFinite(value)) return ''
-  return roundPrice(value * (1 + rate / 100)).toFixed(3)
+  return formatPrice(value * (1 + rate / 100))
 }
 
 function calculatePriceHT(priceTTC: string, rate: number | undefined): string {
@@ -42,18 +47,19 @@ function calculatePriceHT(priceTTC: string, rate: number | undefined): string {
   const value = Number(priceTTC)
   const factor = 1 + rate / 100
   if (!Number.isFinite(value) || factor <= 0) return ''
-  return roundPrice(value / factor).toFixed(3)
+  return formatPrice(value / factor)
 }
 
 export function ProductFormFields({ product, categories, taxRates }: ProductFormFieldsProps) {
   const imageList = product ? product.images.map((i) => i.url).join('\n') : ''
   const toDate = (v: unknown) => (typeof v === 'number' ? String(v) : String(v ?? ''))
+  const toPrice = (v: unknown) => (typeof v === 'number' ? formatPrice(v) : String(v ?? ''))
   const initialTaxRateId = product?.taxRateId ?? taxRates.find((t) => t.isDefault)?.id ?? ''
   const initialTaxRate = taxRates.find((t) => t.id === initialTaxRateId)?.rate
-  const initialPriceHT = toDate(product?.priceHT)
+  const initialPriceHT = toPrice(product?.priceHT)
   const [priceHT, setPriceHT] = useState(initialPriceHT)
   const [priceTTC, setPriceTTC] = useState(() => calculatePriceTTC(initialPriceHT, initialTaxRate))
-  const [costPrice, setCostPrice] = useState(toDate(product?.costPrice ?? ''))
+  const [costPrice, setCostPrice] = useState(toPrice(product?.costPrice ?? ''))
   const [selectedCategoryId, setSelectedCategoryId] = useState(product?.categoryId ?? '')
   const [selectedTaxRateId, setSelectedTaxRateId] = useState(initialTaxRateId)
   const priceHTUserEditedRef = useRef(false)
@@ -71,7 +77,7 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
     const category = categories.find((c) => c.id === categoryId)
     const markup = Number(category?.markupPercent)
     if (!nextCostPrice.trim() || !Number.isFinite(cost) || cost <= 0 || !category?.markupPercent || !Number.isFinite(markup)) return null
-    const computed = roundPrice(cost * (1 + markup / 100)).toFixed(3)
+    const computed = formatPrice(cost * (1 + markup / 100))
     setPriceHT(computed)
     updatePriceTTC(computed, rate)
     return computed
@@ -110,6 +116,29 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
     const rate = taxRates.find((t) => t.id === value)?.rate
     setSelectedTaxRateId(value)
     updatePriceTTC(priceHT, rate)
+  }
+
+  const handlePriceHTBlur = () => {
+    const value = Number(priceHT)
+    if (!priceHT.trim() || !Number.isFinite(value)) return
+    const formatted = formatPrice(value)
+    setPriceHT(formatted)
+    updatePriceTTC(formatted)
+  }
+
+  const handlePriceTTCBlur = () => {
+    const value = Number(priceTTC)
+    if (!priceTTC.trim() || !Number.isFinite(value)) return
+    const formatted = formatPrice(value)
+    setPriceTTC(formatted)
+    const nextPriceHT = calculatePriceHT(formatted, selectedTaxRate)
+    if (nextPriceHT) setPriceHT(nextPriceHT)
+  }
+
+  const handleCostPriceBlur = () => {
+    const value = Number(costPrice)
+    if (!costPrice.trim() || !Number.isFinite(value)) return
+    setCostPrice(formatPrice(value))
   }
 
   return (
@@ -159,11 +188,12 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
           <Label>Prix de revient (DT)</Label>
           <Input
             type="number"
-            step="0.001"
+            step="any"
             min="0"
             name="costPrice"
             value={costPrice}
             onChange={(e) => handleCostPriceChange(e.target.value)}
+            onBlur={handleCostPriceBlur}
             placeholder="Optionnel"
             className="h-11"
           />
@@ -172,13 +202,14 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
           <Label>Prix de vente HT (DT) *</Label>
           <Input
             type="number"
-            step="0.001"
+            step="0.1"
             min="0"
             name="priceHT"
             value={priceHT}
             onChange={(e) => handlePriceHTChange(e.target.value)}
+            onBlur={handlePriceHTBlur}
             required
-            placeholder="0.000"
+            placeholder="0.0"
             className="h-11"
           />
           <p className="mt-1 text-xs text-white/40">Calculé automatiquement si la catégorie a une marge définie, ou saisi manuellement.</p>
@@ -187,13 +218,14 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
           <Label>Prix de vente TTC (DT) *</Label>
           <Input
             type="number"
-            step="0.001"
+            step="0.1"
             min="0"
             name="priceTTC"
             value={priceTTC}
             onChange={(e) => handlePriceTTCChange(e.target.value)}
+            onBlur={handlePriceTTCBlur}
             required
-            placeholder="0.000"
+            placeholder="0.0"
             className="h-11"
           />
           <p className="mt-1 text-xs text-white/40">Calculé automatiquement. Vous pouvez le modifier ; le prix HT sera ajusté.</p>
@@ -237,11 +269,11 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
         </div>
         <div>
           <Label>Poids (kg)</Label>
-          <Input type="number" step="0.001" min="0" name="weightKg" defaultValue={toDate(product?.weightKg ?? '')} placeholder="Optionnel" />
+          <Input type="number" step="any" min="0" name="weightKg" defaultValue={toDate(product?.weightKg ?? '')} placeholder="Optionnel" />
         </div>
         <div>
           <Label>Seuil d&apos;alerte stock</Label>
-          <Input type="number" step="0.001" min="0" name="minStockAlert" defaultValue={toDate(product?.minStockAlert ?? 0)} />
+          <Input type="number" step="any" min="0" name="minStockAlert" defaultValue={toDate(product?.minStockAlert ?? 0)} />
         </div>
       </div>
       <div>
