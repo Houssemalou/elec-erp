@@ -53,10 +53,29 @@ describe('calculateLineTotal', () => {
   })
 
   it('arrondit au millime', () => {
-    const r = calculateLineTotal({ quantity: 3, unitPriceHT: 9.99, taxRate: 13 })
-    expect(r.lineHT).toBe(roundMoney(29.97))
-    expect(r.lineTVA).toBe(roundMoney(29.97 * 0.13))
+    const r = calculateLineTotal({ quantity: 3, unitPriceHT: 9.9, taxRate: 13 })
+    expect(r.lineHT).toBe(roundMoney(29.7))
+    expect(r.lineTVA).toBe(roundMoney(29.7 * 0.13))
     expect(r.lineTTC).toBe(roundMoney(r.lineHT + r.lineTVA))
+  })
+
+  it('arrondit le prix unitaire au dixième avant tout calcul', () => {
+    const r = calculateLineTotal({ quantity: 2, unitPriceHT: 9.975, taxRate: 19 })
+    expect(r.netUnitPrice).toBe(10)
+    expect(r.lineHT).toBe(20)
+    expect(r.lineTVA).toBe(3.8)
+    expect(r.lineTTC).toBe(23.8)
+  })
+
+  it('conserve la remise en montant après arrondi du prix unitaire', () => {
+    const r = calculateLineTotal({
+      quantity: 1,
+      unitPriceHT: 10.085,
+      discountType: 'AMOUNT',
+      discountValue: 0.05,
+      taxRate: 19,
+    })
+    expect(r.netUnitPrice).toBe(10.05)
   })
 })
 
@@ -122,6 +141,6 @@ describe('sérialisation', () => {
   })
 
   it('formatMoney affiche en français avec DT', () => {
-    expect(formatMoney(89.5)).toBe('89,500 DT')
+expect(formatMoney(89.5)).toBe('89,5 DT')
   })
 })

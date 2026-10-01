@@ -11,7 +11,7 @@
 // d'arrondi possible.
 // ============================================================================
 
-import { roundMoney, toNumber } from './money'
+import { roundMoney, roundUnitPrice, toNumber } from './money'
 
 export type DiscountType = 'PERCENT' | 'AMOUNT'
 
@@ -39,7 +39,7 @@ export interface LineTotals {
 
 /** Calcule le prix unitaire net après remise ligne. */
 export function applyLineDiscount(input: LineInput): number {
-  const brut = toNumber(input.unitPriceHT)
+  const brut = roundUnitPrice(toNumber(input.unitPriceHT))
   const qty = toNumber(input.quantity)
   if (qty === 0) return roundMoney(brut)
 

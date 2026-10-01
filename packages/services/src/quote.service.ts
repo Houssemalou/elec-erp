@@ -2,7 +2,7 @@ import { db, QuoteStatus, Prisma, DiscountType } from '@elec/db'
 import {
   calculateDocumentTotals,
   calculateLineTotal,
-  roundMoney,
+  roundUnitPrice,
   toDecimalString,
   type DocumentLineInput,
 } from '@elec/contracts'
@@ -44,7 +44,7 @@ export async function buildLineRows(client: DbClient, lines: DocumentLineInput[]
       sku: line.sku,
       designation: line.designation,
       quantity: Number(line.quantity),
-      unitPriceHT: roundMoney(Number(line.unitPriceHT)),
+      unitPriceHT: roundUnitPrice(Number(line.unitPriceHT)),
       discountType: (line.discountType as DiscountType | undefined) ?? null,
       discountValue: Number(line.discountValue ?? 0),
       netUnitPrice: totals.netUnitPrice,

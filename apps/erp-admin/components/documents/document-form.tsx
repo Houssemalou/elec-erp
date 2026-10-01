@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button, Input, Select, Label, Textarea } from '@/components/ui'
+import { calculateDocumentTotals, calculateLineTotal, roundUnitPrice } from '@elec/contracts'
 import { money } from '@/lib/utils'
 import { startActionLoader, stopActionLoader } from '@/lib/action-events'
 
@@ -111,6 +112,12 @@ export function DocumentForm({
   const updateLine = (key: string, patch: Partial<DocLine>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
 
+  const roundLinePrice = (key: string, value: string) => {
+    const n = Number(value)
+    if (!value.trim() || !Number.isFinite(n)) return
+    updateLine(key, { unitPriceHT: String(roundUnitPrice(n)) })
+  }
+
   const pickProduct = (key: string, productId: string) => {
     const p = products.find((x) => x.id === productId)
     const defaultPrice =
@@ -131,7 +138,7 @@ export function DocumentForm({
       sku: l.sku,
       designation: l.designation,
       quantity: Number(l.quantity || 0),
-      unitPriceHT: Number(l.unitPriceHT || 0),
+      unitPriceHT: roundUnitPrice(Number(l.unitPriceHT || 0)),
       discountType: l.discountType || null,
       discountValue: Number(l.discountValue || 0),
       taxRate: Number(l.taxRate || 0),
@@ -154,24 +161,30 @@ export function DocumentForm({
     })
   }
 
-  const lineTotal = (l: DocLine) => {
-    const q = Number(l.quantity || 0)
-    const pu = Number(l.unitPriceHT || 0)
-    const dv = Number(l.discountValue || 0)
-    let net = pu
-    if (l.discountType === 'PERCENT' && dv > 0) net = pu - (pu * dv) / 100
-    else if (l.discountType === 'AMOUNT' && dv > 0) net = Math.max(0, pu - dv)
-    return q * net
-  }
+  const lineTotal = (l: DocLine) =>
+    calculateLineTotal({
+      quantity: Number(l.quantity || 0),
+      unitPriceHT: Number(l.unitPriceHT || 0),
+      discountType: l.discountType || null,
+      discountValue: Number(l.discountValue || 0),
+      taxRate: l.taxRate,
+    }).lineHT
 
-  const subtotalHT = lines.reduce((s, l) => s + lineTotal(l), 0)
-  const discountAmount =
-    defaultGlobalDiscountType === 'PERCENT'
-      ? (subtotalHT * Number(defaultGlobalDiscountValue || 0)) / 100
-      : defaultGlobalDiscountType === 'AMOUNT'
-        ? Number(defaultGlobalDiscountValue || 0)
-        : 0
-  const totalHT = Math.max(0, subtotalHT - discountAmount)
+  const previewTotals = calculateDocumentTotals({
+    lines: lines.map((l) => ({
+      quantity: Number(l.quantity || 0),
+      unitPriceHT: Number(l.unitPriceHT || 0),
+      discountType: l.discountType || null,
+      discountValue: Number(l.discountValue || 0),
+      taxRate: l.taxRate,
+    })),
+    globalDiscount: defaultGlobalDiscountType
+      ? { type: defaultGlobalDiscountType, value: Number(defaultGlobalDiscountValue || 0) }
+      : null,
+  })
+  const subtotalHT = previewTotals.totalHTBeforeGlobal
+  const discountAmount = previewTotals.discountGlobal
+  const totalHT = previewTotals.totalHT
 
   return (
     <form
@@ -349,8 +362,9 @@ export function DocumentForm({
                     step="any"
                     value={l.unitPriceHT}
                     onChange={(e) => updateLine(l.key, { unitPriceHT: e.target.value })}
+                    onBlur={() => roundLinePrice(l.key, l.unitPriceHT)}
                     className="w-full text-right"
-                    placeholder="0.000"
+                    placeholder="0.0"
                   />
                 </td>
                 <td className="px-2 py-1.5">

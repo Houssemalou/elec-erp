@@ -7,6 +7,11 @@ export function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 1000) / 1000
 }
 
+/** Arrondi du prix unitaire au dixième de dinar (half-up) : 9,975 → 10. */
+export function roundUnitPrice(value: number): number {
+  return Math.round((value + Number.EPSILON) * 10) / 10
+}
+
 /** Convertit une entrée (number | string) en nombre. */
 export function toNumber(value: number | string): number {
   return typeof value === 'string' ? Number(value) : value

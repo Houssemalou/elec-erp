@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPosSaleAction } from '@/lib/actions/erp'
+import { roundUnitPrice } from '@elec/contracts'
 import { money } from '@/lib/utils'
 import { ReceiptPrint } from '@/components/print/receipt-print'
 import { createPortal } from 'react-dom'
@@ -173,7 +174,7 @@ export default function PosTerminal({
             productId: product.id,
             sku: product.sku,
             name: product.name,
-            priceHT: product.priceHT,
+            priceHT: roundUnitPrice(product.priceHT),
             costPrice: product.costPrice,
             taxRate: product.taxRate,
             quantity: 1,
