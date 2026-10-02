@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button, Input, Select, Label, Textarea } from '@/components/ui'
-import { calculateDocumentTotals, calculateLineTotal, roundUnitPrice } from '@elec/contracts'
+import { calculateDocumentTotals, calculateLineTotal, roundMoney } from '@elec/contracts'
 import { money } from '@/lib/utils'
 import { startActionLoader, stopActionLoader } from '@/lib/action-events'
 
@@ -14,7 +14,7 @@ export interface DocLine {
   sku: string
   designation: string
   quantity: string
-  unitPriceHT: string
+  unitPriceTTC: string
   discountType: '' | 'PERCENT' | 'AMOUNT'
   discountValue: string
   taxRate: number
@@ -25,6 +25,7 @@ export interface ProductOption {
   sku: string
   name: string
   priceHT: number
+  priceTTC?: number | null
   costPrice?: number | null
   taxRate: number
 }
@@ -106,7 +107,7 @@ export function DocumentForm({
   const addLine = () =>
     setLines((ls) => [
       ...ls,
-      { key: nextKey(), productId: '', sku: '', designation: '', quantity: '1', unitPriceHT: '', discountType: '', discountValue: '', taxRate: 0 },
+      { key: nextKey(), productId: '', sku: '', designation: '', quantity: '1', unitPriceTTC: '', discountType: '', discountValue: '', taxRate: 0 },
     ])
 
   const updateLine = (key: string, patch: Partial<DocLine>) =>
@@ -115,19 +116,24 @@ export function DocumentForm({
   const roundLinePrice = (key: string, value: string) => {
     const n = Number(value)
     if (!value.trim() || !Number.isFinite(n)) return
-    updateLine(key, { unitPriceHT: String(roundUnitPrice(n)) })
+    updateLine(key, { unitPriceTTC: String(roundMoney(n)) })
   }
 
   const pickProduct = (key: string, productId: string) => {
     const p = products.find((x) => x.id === productId)
-    const defaultPrice =
-      unitPriceFrom === 'cost' ? (p?.costPrice != null ? String(p.costPrice) : '') : p ? String(p.priceHT) : ''
+    const rate = p?.taxRate ?? 0
+    const ttc =
+      unitPriceFrom === 'cost'
+        ? p?.costPrice != null
+          ? p.costPrice * (1 + rate / 100)
+          : null
+        : (p?.priceTTC ?? (p ? roundMoney(p.priceHT * (1 + rate / 100)) : null))
     updateLine(key, {
       productId,
       sku: p?.sku ?? '',
       designation: p?.name ?? '',
-      unitPriceHT: defaultPrice,
-      taxRate: p?.taxRate ?? 0,
+      unitPriceTTC: ttc === null ? '' : String(roundMoney(ttc)),
+      taxRate: rate,
     })
   }
 
@@ -138,7 +144,7 @@ export function DocumentForm({
       sku: l.sku,
       designation: l.designation,
       quantity: Number(l.quantity || 0),
-      unitPriceHT: roundUnitPrice(Number(l.unitPriceHT || 0)),
+      unitPriceTTC: Number(l.unitPriceTTC || 0),
       discountType: l.discountType || null,
       discountValue: Number(l.discountValue || 0),
       taxRate: Number(l.taxRate || 0),
@@ -164,7 +170,7 @@ export function DocumentForm({
   const lineTotal = (l: DocLine) =>
     calculateLineTotal({
       quantity: Number(l.quantity || 0),
-      unitPriceHT: Number(l.unitPriceHT || 0),
+      unitPriceTTC: Number(l.unitPriceTTC || 0),
       discountType: l.discountType || null,
       discountValue: Number(l.discountValue || 0),
       taxRate: l.taxRate,
@@ -173,7 +179,7 @@ export function DocumentForm({
   const previewTotals = calculateDocumentTotals({
     lines: lines.map((l) => ({
       quantity: Number(l.quantity || 0),
-      unitPriceHT: Number(l.unitPriceHT || 0),
+      unitPriceTTC: Number(l.unitPriceTTC || 0),
       discountType: l.discountType || null,
       discountValue: Number(l.discountValue || 0),
       taxRate: l.taxRate,
@@ -313,10 +319,10 @@ export function DocumentForm({
               <th className="px-2 py-2">Produit</th>
               <th className="px-2 py-2">Désignation</th>
               <th className="px-2 py-2 text-right">Qté</th>
-              <th className="px-2 py-2 text-right">PU HT</th>
+              <th className="px-2 py-2 text-right">P.U. TTC</th>
               <th className="px-2 py-2 text-right">Remise</th>
               <th className="px-2 py-2 text-right">TVA %</th>
-              <th className="px-2 py-2 text-right">Total HT</th>
+              <th className="px-2 py-2 text-right">Total TTC</th>
               <th className="px-2 py-2" />
             </tr>
           </thead>
@@ -360,11 +366,11 @@ export function DocumentForm({
                     type="number"
                     min="0"
                     step="any"
-                    value={l.unitPriceHT}
-                    onChange={(e) => updateLine(l.key, { unitPriceHT: e.target.value })}
-                    onBlur={() => roundLinePrice(l.key, l.unitPriceHT)}
+                    value={l.unitPriceTTC}
+                    onChange={(e) => updateLine(l.key, { unitPriceTTC: e.target.value })}
+                    onBlur={() => roundLinePrice(l.key, l.unitPriceTTC)}
                     className="w-full text-right"
-                    placeholder="0.00"
+                    placeholder="0.000"
                   />
                 </td>
                 <td className="px-2 py-1.5">

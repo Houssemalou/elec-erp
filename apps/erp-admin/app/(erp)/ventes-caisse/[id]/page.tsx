@@ -68,7 +68,7 @@ export default async function VenteCaisseDetailPage({
                 <TH>Réf.</TH>
                 <TH>Désignation</TH>
                 <TH className="text-right">Qté</TH>
-                <TH className="text-right">PU HT</TH>
+                <TH className="text-right">PU TTC</TH>
                 <TH className="text-right">TVA</TH>
                 <TH className="text-right">Ligne TTC</TH>
               </TR>
@@ -79,7 +79,7 @@ export default async function VenteCaisseDetailPage({
                   <TD className="font-mono text-xs text-white/70">{item.sku}</TD>
                   <TD className="font-medium text-white">{item.designation}</TD>
                   <TD className="text-right">{Number(item.quantity)}</TD>
-                  <TD className="text-right">{money(item.unitPriceHT)}</TD>
+                  <TD className="text-right">{money(item.unitPriceTTC ?? item.unitPriceHT)}</TD>
                   <TD className="text-right text-white/60">{Number(item.taxRate.rate)}%</TD>
                   <TD className="text-right font-semibold">{money(item.lineTTC)}</TD>
                 </TR>

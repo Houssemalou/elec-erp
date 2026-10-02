@@ -80,7 +80,7 @@ export default async function ProductsPage({
               <TH>Produit</TH>
               <TH>Catégorie</TH>
               <TH>TVA</TH>
-              <TH className="text-right">Prix HT</TH>
+              <TH className="text-right">Prix TTC</TH>
               <TH className="text-right">Stock total</TH>
               <TH>Statut</TH>
               <TH className="text-right">Actions</TH>
@@ -111,7 +111,7 @@ export default async function ProductsPage({
                   <TD>
                     <Badge tone="blue">{Number(p.taxRate.rate)}%</Badge>
                   </TD>
-                  <TD className="text-right font-medium">{money(p.priceHT)}</TD>
+                  <TD className="text-right font-medium">{money(p.priceTTC ?? p.priceHT)}</TD>
                   <TD className="text-right">
                     <span className={total <= Number(p.minStockAlert) ? 'font-semibold text-red-600' : 'text-white/70'}>
                       {total.toLocaleString('fr-FR')}

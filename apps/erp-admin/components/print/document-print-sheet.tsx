@@ -5,6 +5,7 @@ export interface PrintLine {
   designation: string
   quantity: number
   unitPriceHT: number
+  unitPriceTTC: number
   discountLabel: string
   lineHT: number
   taxRate: number
@@ -68,7 +69,7 @@ function buildColumns(showVat: boolean): string {
   if (!showVat) {
     return ['12%', '44%', '8%', '14%', '10%', '12%'].join(' ')
   }
-  return ['9%', '28%', '7%', '10%', '9%', '11%', '9%', '9%', '8%'].join(' ')
+  return ['8%', '24%', '6%', '9%', '9%', '7%', '10%', '7%', '10%', '10%'].join(' ')
 }
 
 const C = 'px-1 py-1 min-w-0 flex items-start'
@@ -99,7 +100,7 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const partyLocation = [partyAddress, partyCity].filter(Boolean).join(', ') || null
   const hasPartyInfo = Boolean(partyName || partyMatriculeFiscal || partyLocation)
   const reason = cleanText(doc.reason)
-  const fillCells = showVat ? 9 : 6
+  const fillCells = showVat ? 10 : 6
   const gridCols = buildColumns(showVat)
 
   return (
@@ -161,6 +162,7 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
         <div className={`${CH} ${BRH} ${H}`}>Désignation</div>
         <div className={`${CH} ${BRH} ${H}`}>Qté</div>
         <div className={`${CH} ${BRH} ${H}`}>P.U. HT</div>
+        {showVat ? <div className={`${CH} ${BRH} ${H}`}>P.U. TTC</div> : null}
         <div className={`${CH} ${BRH} ${H}`}>Remise</div>
         <div className={`${CH} ${showVat ? BR : ''} ${H}`}>{showVat ? 'Prix HT' : 'Montant'}</div>
         {showVat ? (
@@ -177,7 +179,8 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
             <div className={`${CT} ${BR} break-all text-[9px] text-slate-500`} title={l.sku}>{l.sku}</div>
             <div className={`${CT} ${BR} break-words text-slate-900`} title={l.designation}>{l.designation}</div>
             <div className={`${CNY} ${BR}`}>{fmt(l.quantity)}</div>
-            <div className={`${CNY} ${BR}`}>{fmt(showVat ? l.unitPriceHT : l.unitPriceHT * (1 + l.taxRate / 100))}</div>
+            <div className={`${CNY} ${BR}`}>{fmt(showVat ? l.unitPriceHT : l.unitPriceTTC)}</div>
+            {showVat ? <div className={`${CNY} ${BR}`}>{fmt(l.unitPriceTTC)}</div> : null}
             <div className={`${CNY} ${BR}`}>{l.discountLabel || '—'}</div>
             {showVat ? (
               <>

@@ -243,8 +243,9 @@ model Product {
   description   String?
   brand         String?
   barcode       String?  @unique
-  priceHT       Decimal  @db.Decimal(12, 3) // Prix unitaire HT
-  costPrice     Decimal? @db.Decimal(12, 3) // Prix de revient (marge)
+  priceHT       Decimal  @db.Decimal(12, 3) // Prix unitaire HT (déduit du prix TTC saisi)
+  priceTTC      Decimal? @db.Decimal(12, 3) // Prix de vente TTC saisi (prix maître)
+  costPrice     Decimal? @db.Decimal(12, 3) // Prix de revient HT (marge)
   unit          String   @default("unité")
   weightKg      Decimal? @db.Decimal(8, 3)
   categoryId    String?
@@ -548,9 +549,11 @@ model QuoteItem {
   designation   String // Désignation (snapshot)
   quantity      Decimal       @db.Decimal(14, 3)
   unitPriceHT   Decimal       @db.Decimal(12, 3)
+  unitPriceTTC  Decimal?      @db.Decimal(12, 3) // PU TTC saisi par l'utilisateur (prix maître)
   discountType  DiscountType?
   discountValue Decimal       @db.Decimal(12, 3) @default(0)
   netUnitPrice  Decimal       @db.Decimal(12, 3) // PU HT après remise ligne
+  netUnitPriceTTC Decimal?    @db.Decimal(12, 3) // PU TTC après remise ligne
   lineHT        Decimal       @db.Decimal(12, 3) // Prix HT ligne (net × qty)
   taxRateId     String
   lineTVA       Decimal       @db.Decimal(12, 3)
@@ -616,9 +619,11 @@ model InvoiceItem {
   designation   String // Snapshot
   quantity      Decimal       @db.Decimal(14, 3)
   unitPriceHT   Decimal       @db.Decimal(12, 3)
+  unitPriceTTC  Decimal?      @db.Decimal(12, 3) // PU TTC saisi par l'utilisateur (prix maître)
   discountType  DiscountType?
   discountValue Decimal       @db.Decimal(12, 3) @default(0)
   netUnitPrice  Decimal       @db.Decimal(12, 3)
+  netUnitPriceTTC Decimal?    @db.Decimal(12, 3)
   lineHT        Decimal       @db.Decimal(12, 3)
   taxRateId     String
   lineTVA       Decimal       @db.Decimal(12, 3)
@@ -673,9 +678,11 @@ model CreditNoteItem {
   designation   String
   quantity      Decimal       @db.Decimal(14, 3)
   unitPriceHT   Decimal       @db.Decimal(12, 3)
+  unitPriceTTC  Decimal?      @db.Decimal(12, 3) // PU TTC saisi par l'utilisateur (prix maître)
   discountType  DiscountType?
   discountValue Decimal       @db.Decimal(12, 3) @default(0)
   netUnitPrice  Decimal       @db.Decimal(12, 3)
+  netUnitPriceTTC Decimal?    @db.Decimal(12, 3)
   lineHT        Decimal       @db.Decimal(12, 3)
   taxRateId     String
   lineTVA       Decimal       @db.Decimal(12, 3)
@@ -729,6 +736,7 @@ model DeliveryNoteItem {
   designation     String  // Snapshot
   quantity        Decimal @db.Decimal(14, 3)
   unitPriceHT     Decimal @db.Decimal(12, 3)
+  unitPriceTTC    Decimal? @db.Decimal(12, 3) // PU TTC saisi par l'utilisateur (prix maître)
   taxRateId       String
   lineTVA         Decimal @db.Decimal(12, 3)
   lineTTC         Decimal @db.Decimal(12, 3)
@@ -811,9 +819,11 @@ model OnlineOrderItem {
   designation   String
   quantity      Decimal       @db.Decimal(14, 3)
   unitPriceHT   Decimal       @db.Decimal(12, 3)
+  unitPriceTTC  Decimal?      @db.Decimal(12, 3) // PU TTC appliqué par la boutique
   discountType  DiscountType?
   discountValue Decimal       @db.Decimal(12, 3) @default(0)
   netUnitPrice  Decimal       @db.Decimal(12, 3)
+  netUnitPriceTTC Decimal?    @db.Decimal(12, 3)
   lineHT        Decimal       @db.Decimal(12, 3)
   taxRateId     String
   lineTVA       Decimal       @db.Decimal(12, 3)

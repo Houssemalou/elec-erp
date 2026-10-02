@@ -20,7 +20,7 @@ export default async function NewQuotePage() {
           partyLabel="Client"
           partyFreeText
           showVatOption
-          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), taxRate: Number(p.taxRate.rate) }))}
+          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), priceTTC: p.priceTTC === null ? null : Number(p.priceTTC), taxRate: Number(p.taxRate.rate) }))}
           submitAction={createQuoteAction}
           successPath="/devis"
           submitLabel="Créer le devis"

@@ -27,7 +27,7 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
     sku: i.sku,
     designation: i.designation,
     quantity: String(Number(i.quantity)),
-    unitPriceHT: String(Number(i.unitPriceHT)),
+    unitPriceTTC: String(Number(i.unitPriceTTC ?? i.netUnitPrice)),
     discountType: i.discountType ?? '',
     discountValue: String(Number(i.discountValue)),
     taxRate: Number(i.taxRate.rate),
@@ -43,7 +43,7 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
           defaultPartyFreeText={quote.customerName ?? ''}
           showVatOption
           defaultNonAssujettiTva={quote.nonAssujettiTva}
-          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), taxRate: Number(p.taxRate.rate) }))}
+          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), priceTTC: p.priceTTC === null ? null : Number(p.priceTTC), taxRate: Number(p.taxRate.rate) }))}
           submitAction={updateQuoteAction.bind(null, id)}
           successPath="/devis"
           submitLabel="Enregistrer les modifications"

@@ -25,6 +25,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
             product={{
               ...product,
               priceHT: Number(product.priceHT),
+              priceTTC: product.priceTTC === null ? null : Number(product.priceTTC),
               costPrice: product.costPrice === null ? null : Number(product.costPrice),
               weightKg: product.weightKg === null ? null : Number(product.weightKg),
               minStockAlert: Number(product.minStockAlert),

@@ -1,6 +1,10 @@
 // ============================================================================
 // Logique fiscale tunisienne — FONCTIONS PURES
 //
+// Le prix saisi par l'utilisateur est le PRIX TTC : il est affiché tel quel sur
+// la facture, le devis et le ticket de caisse, jamais recalculé. Le HT et la
+// TVA en découlent : HT = TTC / (1 + taux) puis TVA = TTC - HT.
+//
 // Règle essentielle (conformité) : la remise (ligne et globale) est appliquée
 // AVANT le calcul de la TVA. La TVA se calcule toujours sur le prix NET après
 // remise, jamais sur le prix brut.
@@ -11,14 +15,16 @@
 // d'arrondi possible.
 // ============================================================================
 
-import { roundMoney, roundUnitPrice, toNumber } from './money'
+import { roundMoney, toNumber } from './money'
 
 export type DiscountType = 'PERCENT' | 'AMOUNT'
 
 export interface LineInput {
   quantity: number | string
-  /** Prix unitaire HT (brut). */
-  unitPriceHT: number | string
+  /** Prix unitaire HT (brut). Ignoré si unitPriceTTC est renseigné. */
+  unitPriceHT?: number | string | null
+  /** Prix unitaire TTC saisi (prix maître) : sert de base à toute la ligne. */
+  unitPriceTTC?: number | string | null
   discountType?: DiscountType | null
   /** % si discountType = PERCENT, montant en DT si AMOUNT. */
   discountValue?: number | string | null
@@ -29,45 +35,77 @@ export interface LineInput {
 export interface LineTotals {
   /** PU HT net après remise ligne. */
   netUnitPrice: number
-  /** Prix HT de la ligne = netUnitPrice × quantité. */
+  /** PU TTC net après remise ligne (jamais recalculé à l'affichage). */
+  netUnitPriceTTC: number
+  /** Prix HT de la ligne. */
   lineHT: number
-  /** Montant TVA de la ligne = lineHT × taux. */
+  /** Montant TVA de la ligne. */
   lineTVA: number
-  /** Prix TTC de la ligne = lineHT + lineTVA. */
+  /** Prix TTC de la ligne = PU TTC saisi net × quantité. */
   lineTTC: number
 }
 
-/** Calcule le prix unitaire net après remise ligne. */
-export function applyLineDiscount(input: LineInput): number {
-  const brut = roundUnitPrice(toNumber(input.unitPriceHT))
+/** Applique la remise ligne (%) ou en montant (DT) sur un prix de base. */
+function applyDiscountOn(base: number, input: LineInput): number {
   const qty = toNumber(input.quantity)
-  if (qty === 0) return roundMoney(brut)
+  if (qty === 0) return roundMoney(base)
 
   if (input.discountType === 'PERCENT') {
     const percent = toNumber(input.discountValue ?? 0)
-    return roundMoney(brut * (1 - percent / 100))
+    return roundMoney(base * (1 - percent / 100))
   }
   if (input.discountType === 'AMOUNT') {
     const amount = toNumber(input.discountValue ?? 0)
-    return roundMoney(brut - amount)
+    return roundMoney(base - amount)
   }
-  return roundMoney(brut)
+  return roundMoney(base)
+}
+
+/** Prix unitaire HT saisi, ou déduit du prix TTC saisi. */
+export function unitPriceHTFrom(input: LineInput): number {
+  const ttc = input.unitPriceTTC
+  if (ttc === null || ttc === undefined || ttc === '') return toNumber(input.unitPriceHT ?? 0)
+  const factor = 1 + toNumber(input.taxRate) / 100
+  if (factor <= 0) return toNumber(input.unitPriceHT ?? 0)
+  return roundMoney(toNumber(ttc) / factor)
+}
+
+/**
+ * Calcule le prix unitaire net HT après remise ligne.
+ * Cohérent avec calculateLineTotal : la remise s'applique sur le prix saisi
+ * (TTC s'il est fourni), le HT net en découle.
+ */
+export function applyLineDiscount(input: LineInput): number {
+  return calculateLineTotal(input).netUnitPrice
 }
 
 /**
  * Calcule les totaux d'une ligne de devis/facture.
- * Ordre : PU HT → remise → PU net → Prix HT (net × qty) → TVA sur le prix net.
+ * Base : le PU TTC saisi quand il existe (sinon le PU HT saisi).
+ * Ordre : remise sur le prix saisi → prix net → total de ligne → HT = TTC / (1 + taux)
+ * → TVA = TTC - HT.
  */
 export function calculateLineTotal(input: LineInput): LineTotals {
   const qty = toNumber(input.quantity)
   const rate = toNumber(input.taxRate)
+  const factor = 1 + rate / 100
+  const ttcSaisi = input.unitPriceTTC
 
-  const netUnitPrice = applyLineDiscount(input)
+  if (ttcSaisi !== null && ttcSaisi !== undefined && ttcSaisi !== '' && toNumber(ttcSaisi) > 0) {
+    const netUnitPriceTTC = applyDiscountOn(toNumber(ttcSaisi), input)
+    const lineTTC = roundMoney(netUnitPriceTTC * qty)
+    const lineHT = factor > 0 ? roundMoney(lineTTC / factor) : lineTTC
+    const lineTVA = roundMoney(lineTTC - lineHT)
+    const netUnitPrice = qty !== 0 ? roundMoney(lineHT / qty) : lineHT
+    return { netUnitPrice, netUnitPriceTTC, lineHT, lineTVA, lineTTC }
+  }
+
+  const netUnitPrice = applyDiscountOn(toNumber(input.unitPriceHT ?? 0), input)
   const lineHT = roundMoney(netUnitPrice * qty)
   const lineTVA = roundMoney(lineHT * (rate / 100))
   const lineTTC = roundMoney(lineHT + lineTVA)
-
-  return { netUnitPrice, lineHT, lineTVA, lineTTC }
+  const netUnitPriceTTC = factor > 0 ? roundMoney(netUnitPrice * factor) : netUnitPrice
+  return { netUnitPrice, netUnitPriceTTC, lineHT, lineTVA, lineTTC }
 }
 
 export interface GlobalDiscount {
@@ -178,9 +216,11 @@ export interface DocumentLineRow {
   designation: string
   quantity: number
   unitPriceHT: number
+  unitPriceTTC: number
   discountType: DiscountType | null
   discountValue: number
   netUnitPrice: number
+  netUnitPriceTTC: number
   lineHT: number
   taxRate: number
   lineTVA: number

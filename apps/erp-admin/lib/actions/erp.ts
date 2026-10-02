@@ -38,6 +38,7 @@ import {
   createPosSale,
   cancelPosSale,
 } from '@elec/services'
+import { roundMoney } from '@elec/contracts'
 import { requireRole, ADMIN_ROLE, MANAGER_ROLES, STAFF_ROLES } from '@/lib/session'
 import { hash } from 'bcryptjs'
 
@@ -266,10 +267,13 @@ export async function createProduct(fd: FormData): Promise<ActionResult> {
 
   const name = str(fd, 'name')
   if (!name) return { success: false, error: 'Le nom est obligatoire' }
-  if (num(fd, 'priceHT') <= 0) return { success: false, error: 'Le prix HT doit être positif' }
+  const priceTTC = num(fd, 'priceTTC')
+  if (priceTTC <= 0) return { success: false, error: 'Le prix de vente TTC doit être positif' }
   const taxRateId = str(fd, 'taxRateId')
   if (!taxRateId) return { success: false, error: 'Un taux de TVA est obligatoire' }
   const categoryId = str(fd, 'categoryId') || null
+  const taxRate = await db.taxRate.findUnique({ where: { id: taxRateId }, select: { rate: true } })
+  const priceHT = roundMoney(priceTTC / (1 + Number(taxRate?.rate ?? 0) / 100))
 
   let sku = str(fd, 'sku')
   if (categoryId) {
@@ -290,7 +294,8 @@ export async function createProduct(fd: FormData): Promise<ActionResult> {
         description: str(fd, 'description') || null,
         brand: str(fd, 'brand') || null,
         barcode: str(fd, 'barcode') || null,
-        priceHT: num(fd, 'priceHT'),
+        priceHT,
+        priceTTC,
         costPrice: numOrNull(fd, 'costPrice'),
         unit: str(fd, 'unit') || 'unité',
         weightKg: numOrNull(fd, 'weightKg'),
@@ -329,6 +334,10 @@ export async function updateProduct(id: string, fd: FormData): Promise<ActionRes
 
   const slug = str(fd, 'slug') || slugify(`${name}-${sku}`)
   const images = parseImageList(fd)
+  const priceTTC = num(fd, 'priceTTC')
+  if (priceTTC <= 0) return { success: false, error: 'Le prix de vente TTC doit être positif' }
+  const taxRate = await db.taxRate.findUnique({ where: { id: taxRateId }, select: { rate: true } })
+  const priceHT = roundMoney(priceTTC / (1 + Number(taxRate?.rate ?? 0) / 100))
 
   try {
     await db.$transaction(async (tx) => {
@@ -342,7 +351,8 @@ export async function updateProduct(id: string, fd: FormData): Promise<ActionRes
           description: str(fd, 'description') || null,
           brand: str(fd, 'brand') || null,
           barcode: str(fd, 'barcode') || null,
-          priceHT: num(fd, 'priceHT'),
+          priceHT,
+          priceTTC,
           costPrice: numOrNull(fd, 'costPrice'),
           unit: str(fd, 'unit') || 'unité',
           weightKg: numOrNull(fd, 'weightKg'),

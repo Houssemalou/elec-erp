@@ -1,5 +1,5 @@
 import { db, InvoiceStatus, OnlineOrderStatus, OnlinePaymentStatus, Prisma } from '@elec/db'
-import { calculateDocumentTotals, roundMoney, toDecimalString, type DocumentLineInput } from '@elec/contracts'
+import { calculateDocumentTotals, calculateLineTotal, roundMoney, toDecimalString, type DocumentLineInput } from '@elec/contracts'
 import { currentYear, nextSequenceNumber, serializeVatBreakdown, getDefaultWarehouseId } from './helpers'
 import {
   reserveStockCore,
@@ -102,6 +102,7 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
       sku: product.sku,
       designation: product.name,
       quantity,
+      unitPriceTTC: Number(product.priceTTC ?? 0) > 0 ? Number(product.priceTTC) : null,
       unitPriceHT: Number(product.priceHT),
       discountValue: 0,
       discountType: null,
@@ -134,21 +135,27 @@ export async function createOnlineOrder(input: CreateOnlineOrderInput) {
         withInvoice,
         items: {
           create: items.map(({ product, quantity }) => {
-            const price = Number(product.priceHT)
             const rate = Number(product.taxRate.rate)
-            const lineHT = roundMoney(price * quantity)
-            const lineTVA = roundMoney(lineHT * (rate / 100))
+            const priceTTC = Number(product.priceTTC ?? 0)
+            const t = calculateLineTotal({
+              quantity,
+              unitPriceHT: Number(product.priceHT),
+              unitPriceTTC: priceTTC > 0 ? priceTTC : null,
+              taxRate: rate,
+            })
             return {
               productId: product.id,
               sku: product.sku,
               designation: product.name,
               quantity: toDecimalString(quantity),
-              unitPriceHT: toDecimalString(price),
-              netUnitPrice: toDecimalString(price),
-              lineHT: toDecimalString(lineHT),
+              unitPriceHT: toDecimalString(priceTTC > 0 ? t.netUnitPrice : Number(product.priceHT)),
+              unitPriceTTC: toDecimalString(priceTTC > 0 ? priceTTC : t.netUnitPriceTTC),
+              netUnitPrice: toDecimalString(t.netUnitPrice),
+              netUnitPriceTTC: toDecimalString(t.netUnitPriceTTC),
+              lineHT: toDecimalString(t.lineHT),
               taxRateId: product.taxRateId,
-              lineTVA: toDecimalString(lineTVA),
-              lineTTC: toDecimalString(roundMoney(lineHT + lineTVA)),
+              lineTVA: toDecimalString(t.lineTVA),
+              lineTTC: toDecimalString(t.lineTTC),
             }
           }),
         },

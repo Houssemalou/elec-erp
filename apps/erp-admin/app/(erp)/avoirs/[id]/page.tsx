@@ -85,6 +85,7 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
                   <TH>Désignation</TH>
                   <TH className="text-right">Qté</TH>
                   <TH className="text-right">PU HT</TH>
+                  <TH className="text-right">PU TTC</TH>
                   <TH className="text-right">Total HT</TH>
                   <TH className="text-right">TVA</TH>
                 </TR>
@@ -96,6 +97,7 @@ export default async function CreditNoteDetailPage({ params }: { params: Promise
                     <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>
+                    <TD className="text-right">{money(i.unitPriceTTC ?? i.unitPriceHT)}</TD>
                     <TD className="text-right font-medium">{money(i.lineHT)}</TD>
                     <TD className="text-right text-white/50">{Number(i.taxRate.rate)}%</TD>
                   </TR>

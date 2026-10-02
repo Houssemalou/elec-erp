@@ -35,7 +35,7 @@ export default async function NewCreditNotePage({
           partyLabel="Facture"
           partyFieldName="invoiceId"
           partyOptions={invoices.map((i) => ({ id: i.id, label: invoiceLabel(i) }))}
-          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), taxRate: Number(p.taxRate.rate) }))}
+          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), priceTTC: p.priceTTC === null ? null : Number(p.priceTTC), taxRate: Number(p.taxRate.rate) }))}
           submitAction={createCreditNoteAction}
           successPath="/avoirs"
           submitLabel="Créer l&apos;avoir"

@@ -71,15 +71,16 @@ const styles = StyleSheet.create({
   },
   cellLast: { paddingHorizontal: 3 },
   num: { textAlign: 'right' },
-  colSku: { width: '9%' },
-  colDesignation: { width: '28%' },
-  colQty: { width: '7%' },
-  colPu: { width: '10%' },
-  colRemise: { width: '9%' },
-  colPrixHT: { width: '11%' },
-  colTva: { width: '9%' },
-  colMtTva: { width: '9%' },
-  colTtc: { width: '8%' },
+  colSku: { width: '8%' },
+  colDesignation: { width: '24%' },
+  colQty: { width: '6%' },
+  colPu: { width: '9%' },
+  colPuTtc: { width: '9%' },
+  colRemise: { width: '7%' },
+  colPrixHT: { width: '10%' },
+  colTva: { width: '7%' },
+  colMtTva: { width: '10%' },
+  colTtc: { width: '10%' },
   colSkuN: { width: '12%' },
   colDesignationN: { width: '44%' },
   colQtyN: { width: '8%' },
@@ -135,6 +136,7 @@ type PdfLine = {
   designation: string
   quantity: number
   unitPriceHT: number
+  unitPriceTTC: number
   discountLabel: string
   lineHT: number
   taxRate: number
@@ -235,6 +237,7 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text style={[styles.cell, styles.colDesignation, styles.cellCenter]}>Désignation</Text>
               <Text style={[styles.cell, styles.colQty, styles.cellCenter]}>Qté</Text>
               <Text style={[styles.cell, styles.colPu, styles.cellCenter]}>P.U. HT</Text>
+              <Text style={[styles.cell, styles.colPuTtc, styles.cellCenter]}>P.U. TTC</Text>
               <Text style={[styles.cell, styles.colRemise, styles.cellCenter]}>Remise</Text>
               <Text style={[styles.cell, styles.colPrixHT, styles.cellCenter]}>Prix HT</Text>
               <Text style={[styles.cell, styles.colTva, styles.cellCenter]}>TVA %</Text>
@@ -257,8 +260,11 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text style={[styles.cell, showVat ? styles.colDesignation : styles.colDesignationN]}>{l.designation}</Text>
               <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.cellCenter]}>{fmt(l.quantity)}</Text>
               <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.cellCenter]}>
-                {fmt(showVat ? l.unitPriceHT : l.unitPriceHT * (1 + l.taxRate / 100))}
+                {fmt(showVat ? l.unitPriceHT : l.unitPriceTTC)}
               </Text>
+              {showVat ? (
+                <Text style={[styles.cell, styles.colPuTtc, styles.cellCenter]}>{fmt(l.unitPriceTTC)}</Text>
+              ) : null}
               <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.cellCenter]}>{l.discountLabel || '-'}</Text>
               <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.cellCenter]}>
                 {fmt(showVat ? l.lineHT : l.lineTTC)}
@@ -278,6 +284,9 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text style={[styles.cell, showVat ? styles.colDesignation : styles.colDesignationN]}>&#8203;</Text>
               <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.cellCenter]}>&#8203;</Text>
               <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.cellCenter]}>&#8203;</Text>
+              {showVat ? (
+                <Text style={[styles.cell, styles.colPuTtc, styles.cellCenter]}>&#8203;</Text>
+              ) : null}
               <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.cellCenter]}>&#8203;</Text>
               <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.cellCenter]}>&#8203;</Text>
               {showVat ? (
@@ -454,6 +463,7 @@ export async function generateInvoicePdf(
       designation: i.designation,
       quantity: Number(i.quantity),
       unitPriceHT: Number(i.netUnitPrice),
+      unitPriceTTC: Number(i.netUnitPriceTTC ?? i.netUnitPrice),
       discountLabel: discountLabel(i),
       lineHT: Number(i.lineHT),
       taxRate: Number(i.taxRate.rate),
@@ -506,6 +516,7 @@ export async function generateQuotePdf(quoteId: string, options?: { withVat?: bo
       designation: i.designation,
       quantity: Number(i.quantity),
       unitPriceHT: Number(i.netUnitPrice),
+      unitPriceTTC: Number(i.netUnitPriceTTC ?? i.netUnitPrice),
       discountLabel: discountLabel(i),
       lineHT: Number(i.lineHT),
       taxRate: Number(i.taxRate.rate),
@@ -554,6 +565,7 @@ export async function generateCreditNotePdf(creditNoteId: string): Promise<Buffe
       designation: i.designation,
       quantity: Number(i.quantity),
       unitPriceHT: Number(i.netUnitPrice),
+      unitPriceTTC: Number(i.netUnitPriceTTC ?? i.netUnitPrice),
       discountLabel: discountLabel(i),
       lineHT: Number(i.lineHT),
       taxRate: Number(i.taxRate.rate),

@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPosSaleAction } from '@/lib/actions/erp'
-import { roundUnitPrice } from '@elec/contracts'
+import { calculateDocumentTotals, roundMoney } from '@elec/contracts'
 import { money } from '@/lib/utils'
 import { ReceiptPrint } from '@/components/print/receipt-print'
 import { createPortal } from 'react-dom'
@@ -29,6 +29,8 @@ type Product = {
   sku: string
   name: string
   priceHT: number
+  /** Prix de vente TTC saisi sur la fiche produit (null si jamais renseigne). */
+  priceTTC: number | null
   /** Prix de revient HT (null si non renseigné sur la fiche produit). */
   costPrice: number | null
   unit: string
@@ -41,7 +43,8 @@ type CartItem = {
   productId: string
   sku: string
   name: string
-  priceHT: number
+  /** Prix de vente TTC : source de vérité du panier. */
+  priceTTC: number
   costPrice: number | null
   taxRate: number
   quantity: number
@@ -66,6 +69,11 @@ function formatStockQty(qty: number): string {
 /** Prix d'achat TTC = prix de revient HT + TVA. Null si le coût n'est pas renseigné. */
 function costTTC(costPrice: number | null, taxRate: number): number | null {
   return costPrice === null ? null : costPrice * (1 + taxRate / 100)
+}
+
+/** Prix affiché au POS : précision au millime, comme la fiche produit. */
+function priceLabel(value: number): string {
+  return `${money(value)} DT`
 }
 
 type SuccessResult = {
@@ -174,7 +182,7 @@ export default function PosTerminal({
             productId: product.id,
             sku: product.sku,
             name: product.name,
-            priceHT: roundUnitPrice(product.priceHT),
+            priceTTC: roundMoney(product.priceTTC ?? product.priceHT * (1 + product.taxRate / 100)),
             costPrice: product.costPrice,
             taxRate: product.taxRate,
             quantity: 1,
@@ -206,18 +214,21 @@ export default function PosTerminal({
     setCart((prev) => prev.filter((i) => i.productId !== productId))
   }, [])
 
-  const subtotalHT = cart.reduce((s, i) => s + i.priceHT * i.quantity, 0)
-  const discountAmount = discountType === 'PERCENT'
-    ? subtotalHT * (parseFloat(discountValue || '0') / 100)
-    : discountType === 'AMOUNT'
-      ? parseFloat(discountValue || '0')
-      : 0
-  const totalHTAfterDiscount = Math.max(0, subtotalHT - discountAmount)
-  const totalTVA = cart.reduce((s, i) => {
-    const ratio = subtotalHT > 0 ? totalHTAfterDiscount / subtotalHT : 1
-    return s + i.priceHT * i.quantity * ratio * (i.taxRate / 100)
-  }, 0)
-  const totalTTC = totalHTAfterDiscount + totalTVA
+  const subtotalTTC = cart.reduce((s, i) => s + i.priceTTC * i.quantity, 0)
+  const totals = calculateDocumentTotals({
+    lines: cart.map((i) => ({
+      quantity: i.quantity,
+      unitPriceTTC: i.priceTTC,
+      unitPriceHT: 0,
+      taxRate: i.taxRate,
+    })),
+    globalDiscount:
+      discountType === 'NONE' ? null : { type: discountType, value: Number(discountValue || 0) },
+  })
+  const discountAmount = totals.discountGlobal
+  const totalHTAfterDiscount = totals.totalHT
+  const totalTVA = totals.totalTVA
+  const totalTTC = totals.totalTTC
 
   // Coût d'achat TTC et gain : servent à vérifier la marge au moment de la vente.
   // Un article sans prix de revient sur sa fiche rend le total incomplet, on ne
@@ -279,8 +290,8 @@ export default function PosTerminal({
         const receiptItems = cart.map((item) => ({
           name: item.name,
           quantity: item.quantity,
-          unitPriceTTC: item.priceHT * (1 + item.taxRate / 100),
-          lineTTC: item.priceHT * item.quantity * (1 + item.taxRate / 100),
+          unitPriceTTC: item.priceTTC,
+          lineTTC: item.priceTTC * item.quantity,
         }))
         const receiptTotalTTC = totalTTC
 
@@ -448,14 +459,14 @@ export default function PosTerminal({
                   <span className="mt-0.5 text-[10px] text-white/40">{p.categoryName}</span>
                 ) : null}
                 <span className="mt-auto pt-2 font-display text-base font-bold text-accent-400">
-                  {money(p.priceHT * (1 + p.taxRate / 100))}
+                  {priceLabel(p.priceTTC ?? p.priceHT * (1 + p.taxRate / 100))}
                 </span>
                 <span className="text-[11px] text-white/40">
                   Achat TTC :{' '}
                   {p.costPrice === null ? (
                     <span className="text-white/25">non renseigné</span>
                   ) : (
-                    money(p.costPrice * (1 + p.taxRate / 100))
+                    priceLabel(p.costPrice * (1 + p.taxRate / 100))
                   )}
                 </span>
               </button>
@@ -558,7 +569,7 @@ export default function PosTerminal({
           ) : (
             <ul className="space-y-2">
               {cart.map((item) => {
-                const lineTTC = item.priceHT * item.quantity * (1 + item.taxRate / 100)
+                const lineTTC = item.priceTTC * item.quantity
                 const unitCostTTC = costTTC(item.costPrice, item.taxRate)
                 const available = products.find((p) => p.id === item.productId)?.stock ?? 0
                 return (
@@ -567,7 +578,7 @@ export default function PosTerminal({
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-white">{item.name}</p>
                         <p className="text-[11px] text-white/40">
-                          {money(item.priceHT * (1 + item.taxRate / 100))} &times; {item.quantity}
+                          {priceLabel(item.priceTTC)} &times; {item.quantity}
                           <span className="text-white/30"> — stock : {formatStockQty(available)}</span>
                         </p>
                         <p className="text-[11px] text-white/40">
@@ -576,7 +587,7 @@ export default function PosTerminal({
                             <span className="text-white/25">non renseigné</span>
                           ) : (
                             <>
-                              {money(unitCostTTC)} &times; {item.quantity} ={' '}
+                              {priceLabel(unitCostTTC)} &times; {item.quantity} ={' '}
                               <span className="text-white/60">{money(unitCostTTC * item.quantity)}</span>
                             </>
                           )}
@@ -616,8 +627,8 @@ export default function PosTerminal({
         <div className="border-t border-[#2A2A2A] bg-[#1A1A1A] p-4">
           <div className="space-y-1 text-sm">
             <div className="flex justify-between text-white/50">
-              <span>Total HT</span>
-              <span>{money(subtotalHT)}</span>
+              <span>Brut TTC</span>
+              <span>{money(subtotalTTC)}</span>
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-red-400">
@@ -625,12 +636,10 @@ export default function PosTerminal({
                 <span>-{money(discountAmount)}</span>
               </div>
             )}
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-white/50">
-                <span>Net HT</span>
-                <span>{money(totalHTAfterDiscount)}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-white/50">
+              <span>Total HT</span>
+              <span>{money(totalHTAfterDiscount)}</span>
+            </div>
             <div className="flex justify-between text-white/50">
               <span>TVA</span>
               <span>{money(totalTVA)}</span>

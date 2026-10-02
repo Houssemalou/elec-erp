@@ -20,7 +20,7 @@ export default async function NewInvoicePage() {
           partyLabel="Client"
           partyFreeText
           partyDetailsFields
-          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), taxRate: Number(p.taxRate.rate) }))}
+          products={products.map((p) => ({ id: p.id, sku: p.sku, name: p.name, priceHT: Number(p.priceHT), priceTTC: p.priceTTC === null ? null : Number(p.priceTTC), taxRate: Number(p.taxRate.rate) }))}
           submitAction={createInvoiceAction}
           successPath="/factures"
           submitLabel="Créer la facture"

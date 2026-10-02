@@ -28,6 +28,7 @@ function mapLines<T extends { taxRate: { rate: { toString(): string } } }>(
       designation: string
       quantity: { toString(): string }
       netUnitPrice: { toString(): string }
+      netUnitPriceTTC?: { toString(): string } | null
       discountType: string | null
       discountValue: { toString(): string }
       lineHT: { toString(): string }
@@ -41,6 +42,7 @@ function mapLines<T extends { taxRate: { rate: { toString(): string } } }>(
     designation: i.designation,
     quantity: Number(i.quantity),
     unitPriceHT: Number(i.netUnitPrice),
+    unitPriceTTC: Number(i.netUnitPriceTTC ?? i.netUnitPrice),
     discountLabel: discountLabel(i),
     lineHT: Number(i.lineHT),
     taxRate: Number(i.taxRate.rate),

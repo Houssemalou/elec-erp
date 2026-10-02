@@ -2,7 +2,8 @@ import { db, QuoteStatus, Prisma, DiscountType } from '@elec/db'
 import {
   calculateDocumentTotals,
   calculateLineTotal,
-  roundUnitPrice,
+  roundMoney,
+  unitPriceHTFrom,
   toDecimalString,
   type DocumentLineInput,
 } from '@elec/contracts'
@@ -20,9 +21,11 @@ export interface BuildLineRow {
   designation: string
   quantity: number
   unitPriceHT: number
+  unitPriceTTC: number
   discountType: DiscountType | null
   discountValue: number
   netUnitPrice: number
+  netUnitPriceTTC: number
   lineHT: number
   taxRateId: string
   lineTVA: number
@@ -35,6 +38,7 @@ export async function buildLineRows(client: DbClient, lines: DocumentLineInput[]
     const totals = calculateLineTotal({
       quantity: line.quantity,
       unitPriceHT: line.unitPriceHT,
+      unitPriceTTC: line.unitPriceTTC,
       discountType: line.discountType,
       discountValue: line.discountValue,
       taxRate: line.taxRate,
@@ -44,10 +48,12 @@ export async function buildLineRows(client: DbClient, lines: DocumentLineInput[]
       sku: line.sku,
       designation: line.designation,
       quantity: Number(line.quantity),
-      unitPriceHT: roundUnitPrice(Number(line.unitPriceHT)),
+unitPriceHT: unitPriceHTFrom(line),
+      unitPriceTTC: Number(line.unitPriceTTC ?? 0),
       discountType: (line.discountType as DiscountType | undefined) ?? null,
       discountValue: Number(line.discountValue ?? 0),
       netUnitPrice: totals.netUnitPrice,
+      netUnitPriceTTC: totals.netUnitPriceTTC,
       lineHT: totals.lineHT,
       taxRateId: await getTaxRateIdByRate(line.taxRate, client),
       lineTVA: totals.lineTVA,
@@ -107,9 +113,11 @@ export async function createQuote(input: {
             designation: r.designation,
             quantity: toDecimalString(r.quantity),
             unitPriceHT: toDecimalString(r.unitPriceHT),
+            unitPriceTTC: toDecimalString(r.unitPriceTTC),
             discountType: r.discountType,
             discountValue: toDecimalString(r.discountValue),
             netUnitPrice: toDecimalString(r.netUnitPrice),
+            netUnitPriceTTC: toDecimalString(r.netUnitPriceTTC),
             lineHT: toDecimalString(r.lineHT),
             taxRateId: r.taxRateId,
             lineTVA: toDecimalString(r.lineTVA),
@@ -170,9 +178,11 @@ export async function updateQuote(
             designation: r.designation,
             quantity: toDecimalString(r.quantity),
             unitPriceHT: toDecimalString(r.unitPriceHT),
+            unitPriceTTC: toDecimalString(r.unitPriceTTC),
             discountType: r.discountType,
             discountValue: toDecimalString(r.discountValue),
             netUnitPrice: toDecimalString(r.netUnitPrice),
+            netUnitPriceTTC: toDecimalString(r.netUnitPriceTTC),
             lineHT: toDecimalString(r.lineHT),
             taxRateId: r.taxRateId,
             lineTVA: toDecimalString(r.lineTVA),

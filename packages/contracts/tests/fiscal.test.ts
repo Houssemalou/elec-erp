@@ -65,23 +65,42 @@ describe('calculateLineTotal', () => {
     expect(calculateLineTotal({ quantity: 1, unitPriceHT: 87.97, taxRate: 19 }).netUnitPrice).toBe(87.97)
   })
 
-  it('arrondit le prix unitaire au centime avant tout calcul', () => {
-    const r = calculateLineTotal({ quantity: 2, unitPriceHT: 87.9735, taxRate: 19 })
-    expect(r.netUnitPrice).toBe(87.97)
-    expect(r.lineHT).toBe(175.94)
-    expect(r.lineTVA).toBe(roundMoney(175.94 * 0.19))
-    expect(r.lineTTC).toBe(roundMoney(r.lineHT + r.lineTVA))
+  it('conserve le prix TTC saisi au millime près', () => {
+    const r = calculateLineTotal({ quantity: 2, unitPriceTTC: 87.9735, taxRate: 19 })
+    expect(r.netUnitPriceTTC).toBe(roundMoney(87.9735))
+    expect(r.lineTTC).toBe(roundMoney(roundMoney(87.9735) * 2))
+    expect(r.lineHT).toBe(roundMoney(r.lineTTC / 1.19))
+    expect(r.lineTVA).toBe(roundMoney(r.lineTTC - r.lineHT))
   })
 
-  it('conserve la remise en montant après arrondi du prix unitaire', () => {
+  it('déduit le HT du prix TTC saisi, jamais l’inverse', () => {
+    const r = calculateLineTotal({ quantity: 1, unitPriceTTC: 119, taxRate: 19 })
+    expect(r.netUnitPriceTTC).toBe(119)
+    expect(r.netUnitPrice).toBe(100)
+    expect(r.lineHT).toBe(100)
+    expect(r.lineTVA).toBe(19)
+    expect(r.lineTTC).toBe(119)
+  })
+
+  it('applique la remise en montant sur le prix TTC saisi', () => {
     const r = calculateLineTotal({
       quantity: 1,
-      unitPriceHT: 87.9735,
+      unitPriceTTC: 119,
       discountType: 'AMOUNT',
-      discountValue: 0.03,
+      discountValue: 20,
       taxRate: 19,
     })
-    expect(r.netUnitPrice).toBe(87.94)
+    expect(r.netUnitPriceTTC).toBe(99)
+    expect(r.lineTTC).toBe(99)
+    expect(r.lineHT).toBe(roundMoney(99 / 1.19))
+    expect(r.lineTVA).toBe(roundMoney(99 - r.lineHT))
+  })
+
+  it('utilise le prix HT saisi quand aucun TTC n’est fourni', () => {
+    const r = calculateLineTotal({ quantity: 1, unitPriceHT: 100, taxRate: 19 })
+    expect(r.netUnitPrice).toBe(100)
+    expect(r.netUnitPriceTTC).toBe(119)
+    expect(r.lineTTC).toBe(119)
   })
 })
 

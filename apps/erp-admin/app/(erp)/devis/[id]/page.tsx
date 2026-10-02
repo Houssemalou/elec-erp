@@ -118,6 +118,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
                   <TH>Désignation</TH>
                   <TH className="text-right">Qté</TH>
                   <TH className="text-right">PU HT</TH>
+                  <TH className="text-right">PU TTC</TH>
                   <TH className="text-right">Remise</TH>
                   <TH className="text-right">Total HT</TH>
                   <TH className="text-right">TVA</TH>
@@ -130,6 +131,7 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
                     <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
                     <TD className="text-right">{money(i.unitPriceHT)}</TD>
+                    <TD className="text-right">{money(i.unitPriceTTC ?? i.unitPriceHT)}</TD>
                     <TD className="text-right">
                       {i.discountType ? (
                         <span className="text-red-600">
