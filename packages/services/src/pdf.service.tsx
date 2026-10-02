@@ -1,7 +1,9 @@
 import React from 'react'
 import { Document, Page, View, Text, StyleSheet, renderToBuffer } from '@react-pdf/renderer'
 import { db, Prisma } from '@elec/db'
+import { roundMoney } from '@elec/contracts'
 import { getStoreSettings } from './helpers'
+import { TIMBRE_FISCAL } from './invoice.service'
 
 // ============================================================================
 // PDF Devis / Facture — IMPRESSION NOIR & BLANC STRICT
@@ -72,10 +74,9 @@ const styles = StyleSheet.create({
   cellLast: { paddingHorizontal: 3 },
   num: { textAlign: 'right' },
   colSku: { width: '8%' },
-  colDesignation: { width: '24%' },
+  colDesignation: { width: '33%' },
   colQty: { width: '6%' },
   colPu: { width: '9%' },
-  colPuTtc: { width: '9%' },
   colRemise: { width: '7%' },
   colPrixHT: { width: '10%' },
   colTva: { width: '7%' },
@@ -180,10 +181,14 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
   const dateStr = data.date.toLocaleDateString('fr-FR')
   const emptyRows = Math.max(0, 12 - data.lines.length)
   const showVat = data.showVat !== false
-  const netAPayer = data.totalTTC
   const grossTTC = data.lines.reduce((s, l) => s + l.lineTTC, 0)
-  const netTTCExclTimbre = data.totalHTBeforeGlobal - data.discountGlobal + data.totalTVA
+  const totalHTAfterDiscount = roundMoney(data.totalHTBeforeGlobal - data.discountGlobal)
+  const netTTCExclTimbre = roundMoney(totalHTAfterDiscount + data.totalTVA)
   const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
+  // Le net à payer est dérivé des composantes affichées (HT + TVA + timbre) et
+  // non lu en base : le récapitulatif du PDF s'additionne toujours, même si la
+  // facture a été enregistrée sans timbre fiscal.
+  const netAPayer = roundMoney(netTTCExclTimbre + data.timbreFiscal)
   const customerName = cleanText(data.customer.name)
   const customerMatriculeFiscal = cleanText(data.customer.matriculeFiscal)
   const customerAddress = cleanText(data.customer.address)
@@ -231,18 +236,17 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
 
         {/* Tableau des lignes — vertical lines extend through all rows */}
         <View style={styles.table}>
-          {showVat ? (
+{showVat ? (
             <View style={styles.rowHeader}>
               <Text style={[styles.cell, styles.colSku, styles.cellCenter]}>Référence</Text>
               <Text style={[styles.cell, styles.colDesignation, styles.cellCenter]}>Désignation</Text>
               <Text style={[styles.cell, styles.colQty, styles.cellCenter]}>Qté</Text>
               <Text style={[styles.cell, styles.colPu, styles.cellCenter]}>P.U. HT</Text>
-              <Text style={[styles.cell, styles.colPuTtc, styles.cellCenter]}>P.U. TTC</Text>
               <Text style={[styles.cell, styles.colRemise, styles.cellCenter]}>Remise</Text>
-              <Text style={[styles.cell, styles.colPrixHT, styles.cellCenter]}>Prix HT</Text>
+              <Text style={[styles.cell, styles.colPrixHT, styles.cellCenter]}>Total HT</Text>
               <Text style={[styles.cell, styles.colTva, styles.cellCenter]}>TVA %</Text>
               <Text style={[styles.cell, styles.colMtTva, styles.cellCenter]}>Mt TVA</Text>
-              <Text style={[styles.cellLast, styles.colTtc, styles.cellCenter]}>TTC</Text>
+              <Text style={[styles.cellLast, styles.colTtc, styles.cellCenter]}>Total TTC</Text>
             </View>
           ) : (
             <View style={styles.rowHeader}>
@@ -262,9 +266,6 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.cellCenter]}>
                 {fmt(showVat ? l.unitPriceHT : l.unitPriceTTC)}
               </Text>
-              {showVat ? (
-                <Text style={[styles.cell, styles.colPuTtc, styles.cellCenter]}>{fmt(l.unitPriceTTC)}</Text>
-              ) : null}
               <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.cellCenter]}>{l.discountLabel || '-'}</Text>
               <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.cellCenter]}>
                 {fmt(showVat ? l.lineHT : l.lineTTC)}
@@ -284,9 +285,6 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
               <Text style={[styles.cell, showVat ? styles.colDesignation : styles.colDesignationN]}>&#8203;</Text>
               <Text style={[styles.cell, showVat ? styles.colQty : styles.colQtyN, styles.cellCenter]}>&#8203;</Text>
               <Text style={[styles.cell, showVat ? styles.colPu : styles.colPuN, styles.cellCenter]}>&#8203;</Text>
-              {showVat ? (
-                <Text style={[styles.cell, styles.colPuTtc, styles.cellCenter]}>&#8203;</Text>
-              ) : null}
               <Text style={[styles.cell, showVat ? styles.colRemise : styles.colRemiseN, styles.cellCenter]}>&#8203;</Text>
               <Text style={[showVat ? styles.cell : styles.cellLast, showVat ? styles.colPrixHT : styles.colPrixHTN, styles.cellCenter]}>&#8203;</Text>
               {showVat ? (
@@ -320,61 +318,47 @@ function PdfDocumentView({ data }: { data: PdfDocumentData }) {
 
           {/* Totals — bottom right */}
           <View style={styles.recapBlock}>
-            <View style={styles.recapRow}>
-              <Text>Total HT</Text>
-              <Text>{fmt(data.totalHTBeforeGlobal)} DT</Text>
-            </View>
-            {data.discountGlobal > 0 ? (
-              <View style={styles.recapRow}>
-                <Text>Remise globale</Text>
-                <Text>-{fmt(data.discountGlobal)} DT</Text>
-              </View>
-            ) : null}
-            <View style={styles.recapRow}>
-              <Text>Total HT après remise</Text>
-              <Text>{fmt(data.totalHTBeforeGlobal - data.discountGlobal)} DT</Text>
-            </View>
             {showVat ? (
-            <>
-              <View style={styles.recapRow}>
-                <Text>Total HT</Text>
-                <Text>{fmt(data.totalHTBeforeGlobal)} DT</Text>
-              </View>
-              {data.discountGlobal > 0 ? (
+              <>
                 <View style={styles.recapRow}>
-                  <Text>Remise globale</Text>
-                  <Text>-{fmt(data.discountGlobal)} DT</Text>
+                  <Text>Total HT</Text>
+                  <Text>{fmt(data.totalHTBeforeGlobal)} DT</Text>
                 </View>
-              ) : null}
-              <View style={styles.recapRow}>
-                <Text>Total HT après remise</Text>
-                <Text>{fmt(data.totalHTBeforeGlobal - data.discountGlobal)} DT</Text>
-              </View>
-              {data.vatBreakdown.map((b) => (
-                <View key={b.rate} style={styles.recapRow}>
-                  <Text>TVA {fmt(b.rate)}%</Text>
-                  <Text>{fmt(b.tva)} DT</Text>
-                </View>
-              ))}
-            </>
-          ) : (
-            <>
-              <View style={styles.recapRow}>
-                <Text>Total</Text>
-                <Text>{fmt(grossTTC)} DT</Text>
-              </View>
-              {discountTTC > 0.001 ? (
+                {data.discountGlobal > 0 ? (
+                  <View style={styles.recapRow}>
+                    <Text>Remise globale</Text>
+                    <Text>-{fmt(data.discountGlobal)} DT</Text>
+                  </View>
+                ) : null}
                 <View style={styles.recapRow}>
-                  <Text>Remise globale</Text>
-                  <Text>-{fmt(discountTTC)} DT</Text>
+                  <Text>Total HT après remise</Text>
+                  <Text>{fmt(totalHTAfterDiscount)} DT</Text>
                 </View>
-              ) : null}
-              <View style={styles.recapRow}>
-                <Text>Total après remise</Text>
-                <Text>{fmt(netTTCExclTimbre)} DT</Text>
-              </View>
-            </>
-          )}
+                {data.vatBreakdown.map((b) => (
+                  <View key={b.rate} style={styles.recapRow}>
+                    <Text>TVA {fmt(b.rate)}%</Text>
+                    <Text>{fmt(b.tva)} DT</Text>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <>
+                <View style={styles.recapRow}>
+                  <Text>Total</Text>
+                  <Text>{fmt(grossTTC)} DT</Text>
+                </View>
+                {discountTTC > 0.001 ? (
+                  <View style={styles.recapRow}>
+                    <Text>Remise globale</Text>
+                    <Text>-{fmt(discountTTC)} DT</Text>
+                  </View>
+                ) : null}
+                <View style={styles.recapRow}>
+                  <Text>Total après remise</Text>
+                  <Text>{fmt(netTTCExclTimbre)} DT</Text>
+                </View>
+              </>
+            )}
             {data.timbreFiscal > 0 ? (
               <View style={styles.recapRow}>
                 <Text>Timbre fiscal</Text>
@@ -474,7 +458,9 @@ export async function generateInvoicePdf(
     discountGlobal: Number(invoice.discountGlobal),
     vatBreakdown: Object.entries(invoice.vatBreakdown as Record<string, string>).map(([rate, tva]) => ({ rate: Number(rate), tva: Number(tva) })),
     totalTVA: Number(invoice.totalTVA),
-    timbreFiscal: Number(invoice.timbreFiscal),
+    // Timbre fiscal : 1 DT sur toute facture, avec ou sans TVA. Les factures
+    // antérieures à son ajout sont complétées à l'impression.
+    timbreFiscal: TIMBRE_FISCAL,
     totalTTC: Number(invoice.totalTTC),
     showVat: options?.withVat !== false,
     nonAssujettiTva: options?.withVat === false,

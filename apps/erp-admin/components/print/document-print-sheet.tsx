@@ -1,4 +1,5 @@
 import { money } from '@/lib/utils'
+import { roundMoney } from '@elec/contracts'
 
 export interface PrintLine {
   sku: string
@@ -69,7 +70,7 @@ function buildColumns(showVat: boolean): string {
   if (!showVat) {
     return ['12%', '44%', '8%', '14%', '10%', '12%'].join(' ')
   }
-  return ['8%', '24%', '6%', '9%', '9%', '7%', '10%', '7%', '10%', '10%'].join(' ')
+  return ['8%', '33%', '6%', '9%', '7%', '10%', '7%', '10%', '10%'].join(' ')
 }
 
 const C = 'px-1 py-1 min-w-0 flex items-start'
@@ -89,10 +90,13 @@ function cleanText(value: string | null | undefined): string | null {
 export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const dateStr = doc.date.toLocaleDateString('fr-FR')
   const showVat = doc.showVat !== false
-  const netAPayer = doc.totalTTC
   const grossTTC = doc.lines.reduce((s, l) => s + l.lineTTC, 0)
-  const netTTCExclTimbre = doc.totalHTAfterDiscount + doc.totalTVA
+  const netTTCExclTimbre = roundMoney(doc.totalHTAfterDiscount + doc.totalTVA)
   const discountTTC = Math.max(0, grossTTC - netTTCExclTimbre)
+  // Net à payer dérivé des composantes affichées (HT + TVA + timbre) et non lu
+  // en base : le récapitulatif s'additionne même si la facture a été
+  // enregistrée sans timbre fiscal.
+  const netAPayer = roundMoney(netTTCExclTimbre + doc.timbreFiscal)
   const partyName = cleanText(doc.party.name)
   const partyMatriculeFiscal = cleanText(doc.party.matriculeFiscal)
   const partyAddress = cleanText(doc.party.address)
@@ -100,7 +104,7 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
   const partyLocation = [partyAddress, partyCity].filter(Boolean).join(', ') || null
   const hasPartyInfo = Boolean(partyName || partyMatriculeFiscal || partyLocation)
   const reason = cleanText(doc.reason)
-  const fillCells = showVat ? 10 : 6
+  const fillCells = showVat ? 9 : 6
   const gridCols = buildColumns(showVat)
 
   return (
@@ -162,14 +166,13 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
         <div className={`${CH} ${BRH} ${H}`}>Désignation</div>
         <div className={`${CH} ${BRH} ${H}`}>Qté</div>
         <div className={`${CH} ${BRH} ${H}`}>P.U. HT</div>
-        {showVat ? <div className={`${CH} ${BRH} ${H}`}>P.U. TTC</div> : null}
         <div className={`${CH} ${BRH} ${H}`}>Remise</div>
-        <div className={`${CH} ${showVat ? BR : ''} ${H}`}>{showVat ? 'Prix HT' : 'Montant'}</div>
+        <div className={`${CH} ${showVat ? BR : ''} ${H}`}>{showVat ? 'Total HT' : 'Montant'}</div>
         {showVat ? (
           <>
             <div className={`${CH} ${BRH} ${H}`}>TVA</div>
             <div className={`${CH} ${BRH} ${H}`}>Mt TVA</div>
-            <div className={`${CH} ${H}`}>TTC</div>
+            <div className={`${CH} ${H}`}>Total TTC</div>
           </>
         ) : null}
 
@@ -180,7 +183,6 @@ export function DocumentPrintSheet({ doc }: { doc: PrintDocument }) {
             <div className={`${CT} ${BR} break-words text-slate-900`} title={l.designation}>{l.designation}</div>
             <div className={`${CNY} ${BR}`}>{fmt(l.quantity)}</div>
             <div className={`${CNY} ${BR}`}>{fmt(showVat ? l.unitPriceHT : l.unitPriceTTC)}</div>
-            {showVat ? <div className={`${CNY} ${BR}`}>{fmt(l.unitPriceTTC)}</div> : null}
             <div className={`${CNY} ${BR}`}>{l.discountLabel || '—'}</div>
             {showVat ? (
               <>

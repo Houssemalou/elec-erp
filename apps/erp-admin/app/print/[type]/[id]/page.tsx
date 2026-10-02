@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/auth'
 import { STAFF_ROLES } from '@/lib/session'
 import { db } from '@elec/db'
-import { getStoreSettings } from '@elec/services'
+import { getStoreSettings, TIMBRE_FISCAL } from '@elec/services'
 import {
   DocumentPrintSheet,
   type PrintDocument,
@@ -159,7 +159,9 @@ export default async function PrintPage({
       totalHTAfterDiscount: Number(invoice.totalHT),
       vatBreakdown: vatRows(invoice.vatBreakdown),
       totalTVA: Number(invoice.totalTVA),
-      timbreFiscal: Number(invoice.timbreFiscal),
+      // Timbre fiscal : 1 DT sur toute facture, avec ou sans TVA. Les factures
+      // antérieures à son ajout sont complétées à l'impression.
+      timbreFiscal: TIMBRE_FISCAL,
       totalTTC: Number(invoice.totalTTC),
       showVat: withVat,
       nonAssujettiTva: !withVat,

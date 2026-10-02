@@ -4,6 +4,7 @@ import { FileText } from 'lucide-react'
 import { PageHeader, Card, CardHeader, Badge, Table, THead, TR, TH, TD } from '@/components/ui'
 import { ActionButton } from '@/components/ui/action-button'
 import { DocumentTotals } from '@/components/documents/document-totals'
+import { InvoiceMargin } from '@/components/documents/invoice-margin'
 import { PaymentForm } from '@/components/documents/payment-form'
 import { InvoiceGenerateDialog } from '@/components/documents/invoice-generate-dialog'
 import {
@@ -12,6 +13,7 @@ import {
   registerPaymentAction,
 } from '@/lib/actions/erp'
 import { db } from '@elec/db'
+import { calculateMarginTotals } from '@elec/contracts'
 import { money, formatDate, STATUS_LABELS } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -32,7 +34,13 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     include: {
       customer: true,
       createdBy: { select: { name: true } },
-      items: { include: { taxRate: true } },
+      items: {
+        include: {
+          taxRate: true,
+          // Prix de revient actuel : sert uniquement à la marge affichée.
+          product: { select: { costPrice: true } },
+        },
+      },
       payments: { include: { createdBy: { select: { name: true } } } },
       quote: true,
       creditNotes: true,
@@ -51,6 +59,26 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const paid = Number(invoice.paidAmount)
   const remaining = Math.max(0, totalTTC - paid)
   const payable = ['VALIDATED', 'PARTIALLY_PAID', 'PAID'].includes(invoice.status) && remaining > 0.001
+
+  // Rentabilité : calculée par @elec/contracts, jamais recalculée ici.
+  const margin = calculateMarginTotals({
+    discountGlobal: Number(invoice.discountGlobal),
+    lines: invoice.items.map((i) => ({
+      quantity: Number(i.quantity),
+      costPriceHT: i.product?.costPrice !== null && i.product?.costPrice !== undefined
+        ? Number(i.product.costPrice)
+        : null,
+      lineHT: Number(i.lineHT),
+      lineTTC: Number(i.lineTTC),
+      lineTVA: Number(i.lineTVA),
+      taxRate: Number(i.taxRate.rate),
+    })),
+  })
+  // Une ligne de marge par ligne de facture, dans le même ordre.
+  const itemRows = invoice.items.flatMap((item, index) => {
+    const lineMargin = margin.lines[index]
+    return lineMargin ? [{ item, margin: lineMargin }] : []
+  })
 
   return (
     <div>
@@ -119,31 +147,51 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                   <TH className="text-right">Remise</TH>
                   <TH className="text-right">Total HT</TH>
                   <TH className="text-right">TVA</TH>
+                  <TH className="text-right">Coût TTC</TH>
+                  <TH className="text-right">Gain TTC</TH>
                 </TR>
               </THead>
               <tbody>
-                {invoice.items.map((i) => (
-                  <TR key={i.id}>
-                    <TD className="font-mono text-xs break-all text-white/50">{i.sku}</TD>
-                    <TD className="font-medium text-white">{i.designation}</TD>
-                    <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
-                    <TD className="text-right">{money(i.unitPriceHT)}</TD>
-                    <TD className="text-right">{money(i.unitPriceTTC ?? i.unitPriceHT)}</TD>
-                    <TD className="text-right">
-                      {i.discountType ? (
-                        <span className="text-red-600">
-                          {i.discountType === 'PERCENT' ? `${Number(i.discountValue)}%` : money(i.discountValue)}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </TD>
-                    <TD className="text-right font-medium">{money(i.lineHT)}</TD>
-                    <TD className="text-right text-white/50">{Number(i.taxRate.rate)}%</TD>
-                  </TR>
-                ))}
+                {itemRows.map(({ item: i, margin: lineMargin }) => (
+                    <TR key={i.id}>
+                      <TD className="font-mono text-xs break-all text-white/50">{i.sku}</TD>
+                      <TD className="font-medium text-white">{i.designation}</TD>
+                      <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
+                      <TD className="text-right">{money(i.unitPriceHT)}</TD>
+                      <TD className="text-right">{money(i.unitPriceTTC ?? i.unitPriceHT)}</TD>
+                      <TD className="text-right">
+                        {i.discountType ? (
+                          <span className="text-red-600">
+                            {i.discountType === 'PERCENT' ? `${Number(i.discountValue)}%` : money(i.discountValue)}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </TD>
+                      <TD className="text-right font-medium">{money(i.lineHT)}</TD>
+                      <TD className="text-right text-white/50">{Number(i.taxRate.rate)}%</TD>
+                      <TD className="text-right text-white/50">
+                        {lineMargin.costTTC === null ? '—' : money(lineMargin.costTTC)}
+                      </TD>
+                      <TD
+                        className={`text-right font-medium ${
+                          lineMargin.gainGrossTTC === null
+                            ? 'text-white/30'
+                            : lineMargin.gainGrossTTC >= 0
+                              ? 'text-emerald-400'
+                              : 'text-red-400'
+                        }`}
+                      >
+                        {lineMargin.gainGrossTTC === null ? '—' : money(lineMargin.gainGrossTTC)}
+                      </TD>
+                    </TR>
+                  )
+                )}
               </tbody>
             </Table>
+            <p className="px-5 pb-4 text-xs text-white/40">
+              Marge calculée sur le prix de revient actuel des produits, hors TVA déductible. Gain net global ci-contre →
+            </p>
           </Card>
 
           {invoice.payments.length > 0 ? (
@@ -185,6 +233,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             vatBreakdown={invoice.vatBreakdown}
             paidAmount={paid}
           />
+
+          <InvoiceMargin margin={margin} />
 
           <Card>
             <CardHeader title="Actions" />
