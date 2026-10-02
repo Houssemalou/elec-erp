@@ -364,7 +364,7 @@ export function DocumentForm({
                     onChange={(e) => updateLine(l.key, { unitPriceHT: e.target.value })}
                     onBlur={() => roundLinePrice(l.key, l.unitPriceHT)}
                     className="w-full text-right"
-                    placeholder="0.0"
+                    placeholder="0.00"
                   />
                 </td>
                 <td className="px-2 py-1.5">

@@ -27,10 +27,10 @@ export interface ProductFormFieldsProps {
 }
 
 function roundPrice(value: number): number {
-  return Math.round((value + Number.EPSILON) * 10) / 10
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
-/** Un seul chiffre après la virgule, sans zéro inutile : 3.5, 2.2, 3. */
+/** Au plus deux chiffres après la virgule, sans zéro inutile : 88, 1.4, 87.97. */
 function formatPrice(value: number): string {
   return String(roundPrice(value))
 }
@@ -84,13 +84,13 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
   }
 
   const handlePriceHTChange = (value: string) => {
-    priceHTUserEditedRef.current = true
+    priceHTUserEditedRef.current = value.trim() !== ''
     setPriceHT(value)
     updatePriceTTC(value)
   }
 
   const handlePriceTTCChange = (value: string) => {
-    priceHTUserEditedRef.current = true
+    priceHTUserEditedRef.current = value.trim() !== ''
     setPriceTTC(value)
     if (!value.trim()) {
       setPriceHT('')
@@ -107,7 +107,10 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
 
   const handleCategoryChange = (value: string) => {
     setSelectedCategoryId(value)
-    priceHTUserEditedRef.current = false
+    if (priceHTUserEditedRef.current) {
+      updatePriceTTC(priceHT)
+      return
+    }
     const computedPriceHT = applyMarkup(costPrice, value)
     if (!computedPriceHT) updatePriceTTC(priceHT)
   }
@@ -202,30 +205,30 @@ export function ProductFormFields({ product, categories, taxRates }: ProductForm
           <Label>Prix de vente HT (DT) *</Label>
           <Input
             type="number"
-            step="0.1"
+            step="0.01"
             min="0"
             name="priceHT"
             value={priceHT}
             onChange={(e) => handlePriceHTChange(e.target.value)}
             onBlur={handlePriceHTBlur}
             required
-            placeholder="0.0"
+            placeholder="0.00"
             className="h-11"
           />
-          <p className="mt-1 text-xs text-white/40">Calculé automatiquement si la catégorie a une marge définie, ou saisi manuellement.</p>
+          <p className="mt-1 text-xs text-white/40">Repris depuis le prix de revient et la marge de la catégorie tant que vous ne l'avez pas saisi. Dès que vous tapez un prix, il n'est plus modifié automatiquement.</p>
         </div>
         <div>
           <Label>Prix de vente TTC (DT) *</Label>
           <Input
             type="number"
-            step="0.1"
+            step="0.01"
             min="0"
             name="priceTTC"
             value={priceTTC}
             onChange={(e) => handlePriceTTCChange(e.target.value)}
             onBlur={handlePriceTTCBlur}
             required
-            placeholder="0.0"
+            placeholder="0.00"
             className="h-11"
           />
           <p className="mt-1 text-xs text-white/40">Calculé automatiquement. Vous pouvez le modifier ; le prix HT sera ajusté.</p>

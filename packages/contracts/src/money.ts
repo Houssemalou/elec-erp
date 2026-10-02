@@ -7,9 +7,9 @@ export function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 1000) / 1000
 }
 
-/** Arrondi du prix unitaire au dixième de dinar (half-up) : 9,975 → 10. */
+/** Arrondi du prix unitaire au centime (87,9735 → 87,97), sans toucher un prix déjà à 2 décimales. */
 export function roundUnitPrice(value: number): number {
-  return Math.round((value + Number.EPSILON) * 10) / 10
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 /** Convertit une entrée (number | string) en nombre. */

@@ -59,23 +59,29 @@ describe('calculateLineTotal', () => {
     expect(r.lineTTC).toBe(roundMoney(r.lineHT + r.lineTVA))
   })
 
-  it('arrondit le prix unitaire au dixième avant tout calcul', () => {
-    const r = calculateLineTotal({ quantity: 2, unitPriceHT: 9.975, taxRate: 19 })
-    expect(r.netUnitPrice).toBe(10)
-    expect(r.lineHT).toBe(20)
-    expect(r.lineTVA).toBe(3.8)
-    expect(r.lineTTC).toBe(23.8)
+  it('ne modifie pas un prix unitaire écrit avec 2 décimales', () => {
+    expect(calculateLineTotal({ quantity: 1, unitPriceHT: 88, taxRate: 19 }).netUnitPrice).toBe(88)
+    expect(calculateLineTotal({ quantity: 1, unitPriceHT: 1.4, taxRate: 19 }).netUnitPrice).toBe(1.4)
+    expect(calculateLineTotal({ quantity: 1, unitPriceHT: 87.97, taxRate: 19 }).netUnitPrice).toBe(87.97)
+  })
+
+  it('arrondit le prix unitaire au centime avant tout calcul', () => {
+    const r = calculateLineTotal({ quantity: 2, unitPriceHT: 87.9735, taxRate: 19 })
+    expect(r.netUnitPrice).toBe(87.97)
+    expect(r.lineHT).toBe(175.94)
+    expect(r.lineTVA).toBe(roundMoney(175.94 * 0.19))
+    expect(r.lineTTC).toBe(roundMoney(r.lineHT + r.lineTVA))
   })
 
   it('conserve la remise en montant après arrondi du prix unitaire', () => {
     const r = calculateLineTotal({
       quantity: 1,
-      unitPriceHT: 10.085,
+      unitPriceHT: 87.9735,
       discountType: 'AMOUNT',
-      discountValue: 0.05,
+      discountValue: 0.03,
       taxRate: 19,
     })
-    expect(r.netUnitPrice).toBe(10.05)
+    expect(r.netUnitPrice).toBe(87.94)
   })
 })
 
