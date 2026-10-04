@@ -1,8 +1,8 @@
-import { db, InvoiceStatus } from '@elec/db'
 import { PageHeader, Card, CardHeader, Badge, Table, THead, TR, TH, TD } from '@/components/ui'
 import { RevenueChart } from '@/components/charts/revenue-chart'
+import { getFinanceSummary } from '@elec/services'
 import { money } from '@/lib/utils'
-import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight, Landmark, Receipt, PackageSearch } from 'lucide-react'
+import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight, Receipt, PackageSearch, PiggyBank, Percent } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,98 +40,118 @@ function KpiCard({
 }
 
 export default async function FinancePage() {
-  const [invoices, creditNotes, purchaseInvoices] = await Promise.all([
-    db.invoice.findMany({
-      where: { status: { in: [InvoiceStatus.VALIDATED, InvoiceStatus.PAID, InvoiceStatus.PARTIALLY_PAID] } },
-      include: { customer: true },
-    }),
-    db.creditNote.findMany({ where: { status: 'VALIDATED' } }),
-    db.purchaseInvoice.findMany({ where: { status: 'VALIDATED' } }),
-  ])
+  const s = await getFinanceSummary()
 
-  const revenue = invoices.reduce((s, i) => s + Number(i.totalTTC), 0)
-  const collected = invoices.reduce((s, i) => s + Number(i.paidAmount), 0)
-  const receivable = Math.max(0, revenue - collected)
-  const tvaCollected = invoices.reduce((s, i) => s + Number(i.totalTVA), 0)
-  const salesHT = invoices.reduce((s, i) => s + Number(i.totalHT), 0)
-  const credits = creditNotes.reduce((s, n) => s + Number(n.totalTTC), 0)
-  const purchases = purchaseInvoices.reduce((s, p) => s + Number(p.totalTTC), 0)
-
-  const monthKeys = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(new Date().getFullYear(), new Date().getMonth() - (5 - i), 1)
-    return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('fr-FR', { month: 'short' }) }
-  })
-  const monthly = monthKeys.map((m) => ({
-    month: m.label,
-    revenue: invoices
-      .filter((i) => `${i.issueDate.getFullYear()}-${i.issueDate.getMonth()}` === m.key)
-      .reduce((s, i) => s + Number(i.totalTTC), 0),
-  }))
-
-  const vatTotal: Record<string, number> = {}
-  for (const inv of invoices) {
-    if (inv.vatBreakdown && typeof inv.vatBreakdown === 'object') {
-      for (const [rate, tva] of Object.entries(inv.vatBreakdown as Record<string, unknown>)) {
-        vatTotal[rate] = (vatTotal[rate] ?? 0) + Number(tva)
-      }
-    }
-  }
-
-  const topCustomers = invoices
-    .reduce<Record<string, { name: string; total: number }>>((acc, i) => {
-      const name =
-        i.customerName ||
-        (i.customer
-          ? i.customer.companyName || [i.customer.firstName, i.customer.lastName].filter(Boolean).join(' ')
-          : null) ||
-        'Client'
-      const key = i.customerId ?? `free|${name}`
-      acc[key] = { name, total: (acc[key]?.total ?? 0) + Number(i.totalTTC) }
-      return acc
-    }, {})
-  const topList = Object.values(topCustomers).sort((a, b) => b.total - a.total).slice(0, 5)
-
-  const marginRate = salesHT > 0 ? Math.round(((salesHT - purchases) / salesHT) * 1000) / 10 : 0
+  const collectionRate = s.revenueTTC > 0 ? Math.round((s.collectedTTC / s.revenueTTC) * 100) : 0
+  const gainTone = s.gainTTC >= 0 ? 'green' : 'red'
+  const expenseShare = s.revenueTTC > 0 ? Math.round((s.expensesTTC / s.revenueTTC) * 100) : 0
+  const maxCategory = Math.max(...s.expensesByCategory.map((c) => c.amountTTC), 0)
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Finance" description="Synthèse financière : entrées, charges, TVA et créances." />
+      <PageHeader
+        title="Finance"
+        description="Synthèse financière TTC : chiffre d'affaires, charges, gain et créances."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard label="Chiffre d'affaires TTC" value={money(revenue)} sub={`${money(salesHT)} HT`} icon={<TrendingUp className="h-5 w-5" />} />
-        <KpiCard label="Encaissé" value={money(collected)} sub={`Taux d'encaissement ${salesHT > 0 ? Math.round((collected / revenue) * 100) : 0}%`} icon={<Wallet className="h-5 w-5" />} tone="green" />
-        <KpiCard label="Créances clients" value={money(receivable)} sub="Factures validées non encaissées" icon={<ArrowDownLeft className="h-5 w-5" />} tone="amber" />
-        <KpiCard label="TVA collectée" value={money(tvaCollected)} sub="À reverser à la recette" icon={<Landmark className="h-5 w-5" />} />
-        <KpiCard label="Charges (achats)" value={money(purchases)} sub={`Marge brute estimée ${marginRate}%`} icon={<PackageSearch className="h-5 w-5" />} tone="red" />
-        <KpiCard label="Avoirs émis" value={`− ${money(credits)}`} sub="Retours validés" icon={<Receipt className="h-5 w-5" />} tone="red" />
+        <KpiCard
+          label="Chiffre d'affaires TTC"
+          value={money(s.revenueTTC)}
+          sub="Factures et ventes en caisse validées"
+          icon={<TrendingUp className="h-5 w-5" />}
+        />
+        <KpiCard
+          label="Gain TTC"
+          value={money(s.gainTTC)}
+          sub={`${s.gainRate.toFixed(1)} % du CA · après ${money(s.expensesTTC)} de dépenses`}
+          icon={<Percent className="h-5 w-5" />}
+          tone={gainTone}
+        />
+        <KpiCard
+          label="Encaissé TTC"
+          value={money(s.collectedTTC)}
+          sub={`Taux d'encaissement ${collectionRate}%`}
+          icon={<Wallet className="h-5 w-5" />}
+          tone="green"
+        />
+        <KpiCard
+          label="Créances clients"
+          value={money(s.receivableTTC)}
+          sub="Factures validées non encaissées"
+          icon={<ArrowDownLeft className="h-5 w-5" />}
+          tone="amber"
+        />
+        <KpiCard
+          label="Achats TTC"
+          value={money(s.purchasesTTC)}
+          sub="Factures d'achat validées"
+          icon={<PackageSearch className="h-5 w-5" />}
+          tone="red"
+        />
+        <KpiCard
+          label="Dépenses TTC"
+          value={money(s.expensesTTC)}
+          sub={`${expenseShare}% du CA · ${s.expensesByCategory.length} catégorie(s)`}
+          icon={<ArrowUpRight className="h-5 w-5" />}
+          tone="red"
+        />
+        <KpiCard
+          label="Avoirs émis"
+          value={`− ${money(s.creditsTTC)}`}
+          sub="Retours validés"
+          icon={<Receipt className="h-5 w-5" />}
+          tone="red"
+        />
+        <KpiCard
+          label="Coût de revient TTC"
+          value={money(s.costOfGoodsTTC)}
+          sub={
+            s.missingCostLines > 0
+              ? `${s.missingCostLines} ligne(s) sans coût renseigné`
+              : 'Coût des articles vendus'
+          }
+          icon={<PiggyBank className="h-5 w-5" />}
+          tone="amber"
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader title="Chiffre d'affaires mensuel" subtitle="6 derniers mois (factures validées)" />
+          <CardHeader
+            title="Chiffre d'affaires mensuel"
+            subtitle="6 derniers mois (TTC, factures et ventes en caisse validées)"
+          />
           <div className="p-5">
-            <RevenueChart data={monthly} />
+            <RevenueChart data={s.monthly} />
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="TVA par taux" />
+          <CardHeader title="Dépenses par catégorie" subtitle="Répartition des charges saisies" />
           <div className="p-5">
-            {Object.entries(vatTotal).length === 0 ? (
-              <p className="text-sm text-white/40">Aucune donnée</p>
+            {s.expensesByCategory.length === 0 ? (
+              <p className="text-sm text-white/40">Aucune dépense enregistrée</p>
             ) : (
               <ul className="space-y-3 text-sm">
-                {Object.entries(vatTotal)
-                  .sort((a, b) => Number(b[0]) - Number(a[0]))
-                  .map(([rate, tva]) => (
-                    <li key={rate} className="flex items-center justify-between">
-                      <Badge tone="blue">TVA {rate}%</Badge>
-                      <span className="font-semibold text-white">{money(tva)}</span>
-                    </li>
-                  ))}
+                {s.expensesByCategory.map((c) => (
+                  <li key={c.category}>
+                    <div className="mb-1 flex items-center justify-between">
+                      <Badge tone="blue">{c.label}</Badge>
+                      <span className="font-semibold text-white">{money(c.amountTTC)}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[#222222]">
+                      <div
+                        className="h-full rounded-full bg-accent-400/70"
+                        style={{ width: `${maxCategory > 0 ? (c.amountTTC / maxCategory) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-white/40">{c.count} dépense(s)</p>
+                  </li>
+                ))}
                 <li className="flex items-center justify-between border-t border-[#2A2A2A] pt-3">
-                  <span className="text-white/50">Total TVA</span>
-                  <span className="font-bold text-accent-400">{money(tvaCollected)}</span>
+                  <span className="text-white/50">Total</span>
+                  <span className="font-bold text-accent-400">{money(s.expensesTTC)}</span>
                 </li>
               </ul>
             )}
@@ -140,7 +160,7 @@ export default async function FinancePage() {
       </div>
 
       <Card>
-        <CardHeader title="Meilleurs clients" subtitle="Top 5 par chiffre d'affaires" />
+        <CardHeader title="Meilleurs clients" subtitle="Top 5 par chiffre d'affaires TTC" />
         <Table>
           <THead>
             <TR>
@@ -150,19 +170,23 @@ export default async function FinancePage() {
             </TR>
           </THead>
           <tbody>
-            {topList.map((c, i) => (
+            {s.topCustomers.map((c, i) => (
               <TR key={c.name}>
                 <TD className="font-medium text-white">
-                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent-400/10 text-xs font-semibold text-accent-400">{i + 1}</span>
+                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent-400/10 text-xs font-semibold text-accent-400">
+                    {i + 1}
+                  </span>
                   {c.name}
                 </TD>
                 <TD className="text-right font-semibold text-white">{money(c.total)}</TD>
-                <TD className="text-right text-white/50">{revenue > 0 ? Math.round((c.total / revenue) * 100) : 0}%</TD>
+                <TD className="text-right text-white/50">{c.share}%</TD>
               </TR>
             ))}
-            {topList.length === 0 ? (
+            {s.topCustomers.length === 0 ? (
               <TR>
-                <TD colSpan={3} className="py-12 text-center text-white/40">Aucune vente</TD>
+                <TD colSpan={3} className="py-12 text-center text-white/40">
+                  Aucune vente
+                </TD>
               </TR>
             ) : null}
           </tbody>

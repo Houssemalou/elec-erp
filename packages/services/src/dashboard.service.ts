@@ -1,32 +1,20 @@
 import { db, InvoiceStatus, OnlineOrderStatus } from '@elec/db'
+import {
+  getCostOfGoodsTTC,
+  REVENUE_STATUSES as REVENUE_STATUSES_REF,
+  CASH_SALES_WITHOUT_INVOICE as CASH_SALES_WITHOUT_INVOICE_REF,
+} from './finance.service'
 
 // ============================================================================
 // Tableau de bord — KPIs (chiffre d'affaires, produits vendus, stock critique,
 // marge, commandes en attente)
 // ============================================================================
 
-const REVENUE_STATUSES = [
-  InvoiceStatus.VALIDATED,
-  InvoiceStatus.PAID,
-  InvoiceStatus.PARTIALLY_PAID,
-] as const
-
-/**
- * Ventes en caisse SANS facture.
- *
- * Une vente POS crée TOUJOURS un bon de livraison ; la facture n'est créée que
- * si le client la demande. Les dashboards ne lisaient que `invoices` : une vente
- * en caisse sans facture était donc invisible du chiffre d'affaires alors
- * qu'elle sort réellement de stock et est encaissée.
- *
- * On ne retient que les BL sans facture liée (`invoiceId: null`) pour ne pas
- * compter deux fois les ventes qui ont, elles, une facture déjà prise en compte.
- */
-const CASH_SALES_WITHOUT_INVOICE = {
-  source: 'POS',
-  status: 'VALIDATED',
-  invoiceId: null,
-} as const
+// Les critères de chiffre d'affaires sont définis une seule fois dans le
+// service finance, qui en est la source de vérité : le tableau de bord et
+// l'onglet Finance doivent compter exactement les mêmes ventes.
+const REVENUE_STATUSES = REVENUE_STATUSES_REF
+const CASH_SALES_WITHOUT_INVOICE = CASH_SALES_WITHOUT_INVOICE_REF
 
 export async function getDashboardKpis() {
   const [invoices, cashSales, orders, stockAlerts, lowStockCount, topProducts, topCashItems] = await Promise.all([
@@ -64,6 +52,8 @@ export async function getDashboardKpis() {
   const revenue =
     invoices.reduce((sum, inv) => sum + Number(inv.totalTTC), 0) +
     cashSales.reduce((sum, sale) => sum + Number(sale.totalTTC), 0)
+  // Les totaux sont affichés en TTC partout dans l'onglet Finance : la carte
+  // « CA » n'expose plus de sous-titre HT, qui mélangeait deux bases.
   // Une vente en caisse est encaissée comptant : le BL n'a pas de `paidAmount`,
   // son TTC est donc l'encaissé du jour.
   const collected =
@@ -149,43 +139,31 @@ export async function getDashboardKpis() {
 }
 
 /**
- * Marge moyenne pondérée (si coût renseigné).
+ * Marge brute sur le chiffre d'affaires TTC.
  *
- * Les ventes en caisse sans facture entrent aussi : leur HT est une vente
- * réelle, les exclure gonflerait le taux de marge. Le coût d'achat est pris
- * sur la fiche produit (coût actuel), comme pour les factures.
+ * Le coût de revient est ramené en TTC par `getCostOfGoodsTTC` (coût produit HT
+ * × taux de la ligne), ce qui rend le gain comparable au chiffre d'affaires
+ * affiché. Les ventes en caisse sans facture sont incluses : leur TTC est une
+ * vente réelle, les exclure gonflerait le taux de marge.
  */
 export async function getMarginKpi() {
-  const [invoices, cashSales] = await Promise.all([
-    db.invoice.findMany({
-      where: { status: { in: [...REVENUE_STATUSES] } },
-      include: { items: { include: { product: true } } },
-    }),
-    db.deliveryNote.findMany({
-      where: CASH_SALES_WITHOUT_INVOICE,
-      include: { items: { include: { product: true } } },
-    }),
+  const [invoices, cashSales, cost] = await Promise.all([
+    db.invoice.findMany({ where: { status: { in: [...REVENUE_STATUSES] } }, select: { totalTTC: true } }),
+    db.deliveryNote.findMany({ where: CASH_SALES_WITHOUT_INVOICE, select: { totalTTC: true } }),
+    getCostOfGoodsTTC(),
   ])
-  let totalCost = 0
-  let totalHT = 0
-  for (const inv of invoices) {
-    totalHT += Number(inv.totalHT)
-    for (const item of inv.items) {
-      if (item.product?.costPrice) {
-        totalCost += Number(item.product.costPrice) * Number(item.quantity)
-      }
-    }
+  const revenueTTC =
+    invoices.reduce((s, i) => s + Number(i.totalTTC), 0) +
+    cashSales.reduce((s, p) => s + Number(p.totalTTC), 0)
+  const gainTTC = revenueTTC - cost.costTTC
+  const marginRate = revenueTTC > 0 ? (gainTTC / revenueTTC) * 100 : 0
+  return {
+    totalCost: cost.costTTC,
+    revenueTTC,
+    gainTTC: Math.round(gainTTC * 1000) / 1000,
+    marginRate: Math.round(marginRate * 100) / 100,
+    missingCostLines: cost.missingCostLines,
   }
-  for (const sale of cashSales) {
-    totalHT += Number(sale.totalHT)
-    for (const item of sale.items) {
-      if (item.product?.costPrice) {
-        totalCost += Number(item.product.costPrice) * Number(item.quantity)
-      }
-    }
-  }
-  const marginRate = totalHT > 0 ? ((totalHT - totalCost) / totalHT) * 100 : 0
-  return { totalCost, totalHT, marginRate: Math.round(marginRate * 100) / 100 }
 }
 
 /** Série de chiffre d'affaires TTC par mois, factures + ventes en caisse. */

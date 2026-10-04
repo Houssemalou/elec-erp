@@ -16,6 +16,8 @@ import {
   PiggyBank,
   Monitor,
   Landmark,
+  Wallet,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -41,6 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ALL_STAFF },
       { href: '/finance', label: 'Finance', icon: PiggyBank, roles: MANAGER },
+      { href: '/depenses', label: 'Dépenses', icon: Wallet, roles: MANAGER },
     ],
   },
   {

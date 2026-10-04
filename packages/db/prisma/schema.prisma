@@ -178,6 +178,7 @@ model User {
   customer        Customer?
   creditNotes     CreditNote[]     @relation("CreditNoteCreator")
   deliveryNotes   DeliveryNote[]
+  expenses        Expense[]        @relation("ExpenseCreator")
 
   @@index([role])
   @@map("users")
@@ -900,4 +901,41 @@ model StoreSettings {
   defaultWarehouse Warehouse? @relation(fields: [defaultWarehouseId], references: [id])
 
   @@map("store_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Dépenses (charges hors achats : loyer, salaires, énergie, transport…)
+// ---------------------------------------------------------------------------
+
+/// Catégories de charges gérées dans l'onglet Finance.
+enum ExpenseCategory {
+  LOYER
+  SALAIRES
+  ELECTRICITE
+  TRANSPORT
+  FOURNITURES
+  IMPOTS
+  AUTRE
+}
+
+/// Dépense saisie en TTC : l'entreprise n'étant pas assujettie à la TVA, le
+/// montant payé est le montant compté, déduit tel quel du gain.
+model Expense {
+  id            String          @id @default(cuid())
+  number        String          @unique // DEP-YYYY-######
+  label         String
+  category      ExpenseCategory @default(AUTRE)
+  amountTTC     Decimal         @db.Decimal(12, 3)
+  expenseDate   DateTime        @default(now())
+  paymentMethod PaymentMethod   @default(CASH)
+  notes         String?
+  createdById   String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  createdBy User @relation("ExpenseCreator", fields: [createdById], references: [id])
+
+  @@index([expenseDate])
+  @@index([category])
+  @@map("expenses")
 }

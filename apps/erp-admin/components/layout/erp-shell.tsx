@@ -13,7 +13,15 @@ import { startActionLoader } from '@/lib/action-events'
 
 const UNLOCK_CODE = 'haaloui20252026'
 const UNLOCK_KEY = 'erp-sections-unlocked'
-const OPEN_SECTIONS = new Set(['/pos', '/ventes-caisse', '/commandes', '/devis', '/factures', '/avoirs'])
+const OPEN_SECTIONS = new Set([
+  '/pos',
+  '/ventes-caisse',
+  '/commandes',
+  '/devis',
+  '/factures',
+  '/avoirs',
+  '/depenses',
+])
 const OPEN_GROUPS = new Set(['Ventes', 'Catalogue & stock'])
 
 function SidebarContent({

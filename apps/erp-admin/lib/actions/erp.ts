@@ -7,6 +7,8 @@ import {
   QuoteStatus,
   PurchaseOrderStatus,
   OnlineOrderStatus,
+  type ExpenseCategory,
+  type PaymentMethod,
 } from '@elec/db'
 import {
   StockMovementType,
@@ -37,6 +39,10 @@ import {
   runInventory,
   createPosSale,
   cancelPosSale,
+  createExpense,
+  updateExpense as updateExpenseService,
+  deleteExpense as deleteExpenseService,
+  type ExpenseInput,
 } from '@elec/services'
 import { roundMoney, unitPriceHTFrom } from '@elec/contracts'
 import { requireRole, ADMIN_ROLE, MANAGER_ROLES, STAFF_ROLES } from '@/lib/session'
@@ -1126,6 +1132,106 @@ export async function updateStoreSettings(fd: FormData): Promise<ActionResult> {
   })
   revalidatePath('/parametres')
   return { success: true }
+}
+
+// ============================================================================
+// Dépenses — charges hors achats (loyer, salaires, énergie, transport…)
+// Montants saisis en TTC : l'entreprise n'est pas assujettie à la TVA.
+// ============================================================================
+
+const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  'LOYER',
+  'SALAIRES',
+  'ELECTRICITE',
+  'TRANSPORT',
+  'FOURNITURES',
+  'IMPOTS',
+  'AUTRE',
+]
+
+const EXPENSE_PAYMENT_METHODS: PaymentMethod[] = [
+  'CASH',
+  'CARD',
+  'BANK_TRANSFER',
+  'CHEQUE',
+  'EDAHABIA',
+  'ONLINE',
+]
+
+/** Valide le payload d'une dépense. Partagé par la création et la mise à jour. */
+function parseExpense(fd: FormData): { ok: true; data: ExpenseInput } | { ok: false; error: string } {
+  const label = str(fd, 'label')
+  if (!label) return { ok: false, error: 'Le libellé est obligatoire' }
+
+  const amountTTC = num(fd, 'amountTTC')
+  if (!(amountTTC > 0)) return { ok: false, error: 'Le montant doit être supérieur à zéro' }
+
+  const category = str(fd, 'category') as ExpenseCategory
+  if (!EXPENSE_CATEGORIES.includes(category)) return { ok: false, error: 'Catégorie invalide' }
+
+  const paymentMethod = str(fd, 'paymentMethod') as PaymentMethod
+  if (!EXPENSE_PAYMENT_METHODS.includes(paymentMethod)) return { ok: false, error: 'Moyen de règlement invalide' }
+
+  return {
+    ok: true,
+    data: {
+      label,
+      category,
+      amountTTC,
+      expenseDate: str(fd, 'expenseDate') || null,
+      paymentMethod,
+      notes: str(fd, 'notes') || null,
+    },
+  }
+}
+
+/** La liste et l'onglet Finance doivent.refresh après toute écriture. */
+function revalidateAfterExpenseChange(extraPath?: string) {
+  revalidatePath('/depenses')
+  revalidatePath('/finance')
+  if (extraPath) revalidatePath(extraPath)
+}
+
+export async function createExpenseAction(fd: FormData): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  const parsed = parseExpense(fd)
+  if (!parsed.ok) return { success: false, error: parsed.error }
+
+  try {
+    const expense = await createExpense(parsed.data, user.id)
+    revalidateAfterExpenseChange()
+    return { success: true, id: expense.id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function updateExpenseAction(id: string, fd: FormData): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  const parsed = parseExpense(fd)
+  if (!parsed.ok) return { success: false, error: parsed.error }
+
+  try {
+    await updateExpenseService(id, parsed.data)
+    revalidateAfterExpenseChange(`/depenses/${id}/edit`)
+    return { success: true, id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function deleteExpense(id: string): Promise<ActionResult> {
+  const user = await clean(ADMIN_ROLE)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await deleteExpenseService(id)
+    revalidateAfterExpenseChange()
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
 }
 
 // ============================================================================
