@@ -159,6 +159,79 @@ describe('calculateDocumentTotals', () => {
   })
 })
 
+describe('remise globale sur base TTC (POS)', () => {
+  // Une seule ligne à 19 % : c'est le cas le plus courant en caisse.
+  const single = [{ quantity: 1, unitPriceTTC: 119, taxRate: 19 }]
+
+  it('déduit la remise en dinars du TTC affiché', () => {
+    const r = calculateDocumentTotals({
+      lines: single,
+      globalDiscount: { type: 'AMOUNT', value: 10 },
+      discountBasis: 'TTC',
+    })
+    // 119 - 10 = 109 TTC, et non 119 - 10×1,19 = 107,10
+    expect(r.totalTTC).toBe(109)
+    expect(r.discountGlobalTTC).toBe(10)
+    // Le HT est déduit du TTC net : 109 / 1,19 = 91,597
+    expect(r.totalHT).toBe(91.597)
+    expect(r.totalTVA).toBe(17.403)
+    // L'invariant des documents tient : la remise stockée reste en HT.
+    expect(r.totalHTBeforeGlobal - r.discountGlobal).toBe(r.totalHT)
+  })
+
+  it('donne le même résultat qu\'une remise HT pour un pourcentage', () => {
+    const ttc = calculateDocumentTotals({
+      lines: single,
+      globalDiscount: { type: 'PERCENT', value: 10 },
+      discountBasis: 'TTC',
+    })
+    const ht = calculateDocumentTotals({
+      lines: single,
+      globalDiscount: { type: 'PERCENT', value: 10 },
+    })
+    // Un pourcentage est proportionnel : la base n'a pas d'effet.
+    expect(ttc.totalTTC).toBe(ht.totalTTC)
+    expect(ttc.totalHT).toBe(ht.totalHT)
+  })
+
+  it('répartit la remise TTC entre les taux sans perte de centime', () => {
+    const mixed = [
+      { quantity: 2, unitPriceTTC: 119, taxRate: 19 },
+      { quantity: 1, unitPriceTTC: 56.5, taxRate: 13 },
+    ]
+    const r = calculateDocumentTotals({
+      lines: mixed,
+      globalDiscount: { type: 'AMOUNT', value: 7.777 },
+      discountBasis: 'TTC',
+    })
+    // TTC avant = 238 + 56,50 = 294,50 ; net = 294,50 - 7,777 = 286,723
+    expect(r.totalTTC).toBe(286.723)
+    // Les bases ventilées doivent sommer exactement au TTC net.
+    const breakdownTTC = r.vatBreakdown.reduce((s, b) => s + b.baseHT + b.tva, 0)
+    expect(breakdownTTC).toBeCloseTo(286.723, 3)
+    expect(r.totalHT + r.totalTVA).toBeCloseTo(r.totalTTC, 3)
+    // Chaque taux reste cohérent avec son HT, à l'arrondi de millime près :
+    // en base TTC la TVA est le complément du TTC déduit, pas le produit du HT.
+    for (const b of r.vatBreakdown) {
+      const fromRate = Math.round(b.baseHT * (b.rate / 100) * 1000) / 1000
+      // Écart borné par l'arrondi de la ventilation, pas nul.
+      expect(Math.abs(b.tva - fromRate)).toBeLessThanOrEqual(0.001)
+    }
+  })
+
+  it('ignore une remise supérieure au TTC', () => {
+    const r = calculateDocumentTotals({
+      lines: single,
+      globalDiscount: { type: 'AMOUNT', value: 500 },
+      discountBasis: 'TTC',
+    })
+    // Pas de total négatif : la base réduite est ramenée à zéro.
+    expect(r.totalTTC).toBe(0)
+    expect(r.totalHT).toBe(0)
+    expect(r.totalTVA).toBe(0)
+  })
+})
+
 describe('sérialisation', () => {
   it('toDecimalString produit 3 décimales', () => {
     expect(toDecimalString(89.5)).toBe('89.500')

@@ -456,10 +456,12 @@ model PurchaseInvoiceItem {
   sku                String // Référence (snapshot)
   designation        String // Désignation (snapshot)
   quantity           Decimal      @db.Decimal(14, 3)
-  unitPriceHT        Decimal      @db.Decimal(12, 3) // Prix d'achat (coût)
+  unitPriceHT        Decimal      @db.Decimal(12, 3) // Déduit du PU TTC d'achat saisi
+  unitPriceTTC       Decimal?     @db.Decimal(12, 3) // PU TTC d'achat saisi (prix maître)
   discountType       DiscountType?
   discountValue      Decimal      @db.Decimal(12, 3) @default(0)
   netUnitPrice       Decimal      @db.Decimal(12, 3)
+  netUnitPriceTTC    Decimal?     @db.Decimal(12, 3)
   lineHT             Decimal      @db.Decimal(12, 3)
   taxRateId          String
   lineTVA            Decimal      @db.Decimal(12, 3)

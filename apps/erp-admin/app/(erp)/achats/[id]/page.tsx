@@ -73,9 +73,10 @@ export default async function PurchaseInvoiceDetailPage({ params }: { params: Pr
                   <TH>Réf.</TH>
                   <TH>Désignation</TH>
                   <TH className="text-right">Qté</TH>
-                  <TH className="text-right">PU HT (coût)</TH>
+                  <TH className="text-right">PU TTC (coût)</TH>
+                  <TH className="text-right">PU HT</TH>
                   <TH className="text-right">Remise</TH>
-                  <TH className="text-right">Total HT</TH>
+                  <TH className="text-right">Total TTC</TH>
                   <TH className="text-right">TVA</TH>
                 </TR>
               </THead>
@@ -85,7 +86,8 @@ export default async function PurchaseInvoiceDetailPage({ params }: { params: Pr
                     <TD className="font-mono text-xs break-all text-white/50">{i.sku}</TD>
                     <TD className="font-medium text-white">{i.designation}</TD>
                     <TD className="text-right">{Number(i.quantity).toLocaleString('fr-FR')}</TD>
-                    <TD className="text-right">{money(i.unitPriceHT)}</TD>
+                    <TD className="text-right font-medium">{money(i.unitPriceTTC ?? i.unitPriceHT)}</TD>
+                    <TD className="text-right text-white/50">{money(i.unitPriceHT)}</TD>
                     <TD className="text-right">
                       {i.discountType ? (
                         <span className="text-red-600">
@@ -95,7 +97,7 @@ export default async function PurchaseInvoiceDetailPage({ params }: { params: Pr
                         '—'
                       )}
                     </TD>
-                    <TD className="text-right font-medium">{money(i.lineHT)}</TD>
+                    <TD className="text-right font-medium">{money(i.lineTTC)}</TD>
                     <TD className="text-right text-white/50">{Number(i.taxRate.rate)}%</TD>
                   </TR>
                 ))}

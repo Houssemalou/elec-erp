@@ -38,7 +38,7 @@ import {
   createPosSale,
   cancelPosSale,
 } from '@elec/services'
-import { roundMoney } from '@elec/contracts'
+import { roundMoney, unitPriceHTFrom } from '@elec/contracts'
 import { requireRole, ADMIN_ROLE, MANAGER_ROLES, STAFF_ROLES } from '@/lib/session'
 import { hash } from 'bcryptjs'
 
@@ -92,13 +92,20 @@ function slugify(input: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-/** Lignes de document sérialisées en JSON dans le champ `lines`. */
+/**
+ * Lignes de document sérialisées en JSON dans le champ `lines`.
+ *
+ * Le prix transmis est TOUJOURS le PU TTC : c'est la valeur saisie dans le
+ * formulaire (`DocumentForm` n'expose qu'un champ TTC) et la seule référence.
+ * `unitPriceTTC` est donc lu ici, et non `unitPriceHT` — lire ce dernier
+ * renvoyait systématiquement 0, toutes les lignes tombaient à zéro.
+ */
 function parseLines(fd: FormData): Array<{
   productId: string | null
   sku: string
   designation: string
   quantity: number
-  unitPriceHT: number
+  unitPriceTTC: number
   discountType: 'PERCENT' | 'AMOUNT' | null
   discountValue: number
   taxRate: number
@@ -113,7 +120,7 @@ function parseLines(fd: FormData): Array<{
         sku: String(l.sku ?? ''),
         designation: String(l.designation ?? ''),
         quantity: Number(l.quantity ?? 0),
-        unitPriceHT: Number(l.unitPriceHT ?? 0),
+        unitPriceTTC: Number(l.unitPriceTTC ?? l.unitPriceHT ?? 0),
         discountType: (l.discountType as 'PERCENT' | 'AMOUNT') ?? null,
         discountValue: Number(l.discountValue ?? 0),
         taxRate: Number(l.taxRate ?? 0),
@@ -841,10 +848,11 @@ export async function createPurchaseOrderAction(fd: FormData): Promise<ActionRes
   if (!user) return { success: false, error: 'Accès non autorisé' }
   const supplierId = str(fd, 'supplierId')
   if (!supplierId) return { success: false, error: 'Le fournisseur est obligatoire' }
+  // Le bon de commande attend un PU HT : on déduit le HT du PU TTC saisi.
   const lines = parseLines(fd).map((l) => ({
     productId: l.productId as string,
     quantity: l.quantity,
-    unitPriceHT: l.unitPriceHT,
+    unitPriceHT: unitPriceHTFrom({ quantity: 1, unitPriceTTC: l.unitPriceTTC, taxRate: l.taxRate }),
     taxRate: l.taxRate,
   }))
   if (lines.length === 0) return { success: false, error: 'Ajoutez au moins une ligne' }

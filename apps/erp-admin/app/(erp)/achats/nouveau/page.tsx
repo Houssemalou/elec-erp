@@ -21,7 +21,7 @@ export default async function NewPurchaseInvoicePage() {
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title="Nouvelle facture d'achat"
-        description="Enregistrez une facture reçue de votre fournisseur (PU HT = prix d'achat du produit)."
+        description="Enregistrez une facture reçue de votre fournisseur. Le prix d'achat se saisit en TTC, comme sur une facture de vente."
       />
       <Card className="p-6">
         <DocumentForm
@@ -33,6 +33,7 @@ export default async function NewPurchaseInvoicePage() {
             sku: p.sku,
             name: p.name,
             priceHT: Number(p.priceHT),
+            priceTTC: p.priceTTC != null ? Number(p.priceTTC) : null,
             costPrice: p.costPrice != null ? Number(p.costPrice) : null,
             taxRate: Number(p.taxRate.rate),
           }))}
@@ -43,6 +44,7 @@ export default async function NewPurchaseInvoicePage() {
           dateName="issueDate"
           extraDate={{ label: 'Échéance', name: 'dueDate', default: '' }}
           unitPriceFrom="cost"
+          totalsInTTC
         />
       </Card>
     </div>

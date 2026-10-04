@@ -113,11 +113,25 @@ export interface GlobalDiscount {
   value: number | string
 }
 
+/** Base sur laquelle la remise globale est déduite. */
+export type DiscountBasis = 'HT' | 'TTC'
+
 export interface DocumentInput {
   lines: LineInput[]
   globalDiscount?: GlobalDiscount | null
   /** Timbre fiscal : 1 DT sur les factures, 0 sur les devis. */
   timbreFiscal?: number | string
+  /**
+   * Base de la remise globale.
+   *
+   * `'HT'` (défaut) : la remise réduit la base HT et la TVA suit. C'est la
+   * base des documents fiscaux.
+   *
+   * `'TTC'` : la remise réduit le TTC affiché au client ; le HT et la TVA de
+   * chaque taux sont déduits du TTC réduit. Utilisé au POS, où le caissier
+   * raisonne en TTC (prix des articles, ticket, encaissement).
+   */
+  discountBasis?: DiscountBasis
 }
 
 export interface RateBreakdown {
@@ -133,8 +147,14 @@ export interface DocumentTotals {
   lines: LineTotals[]
   /** Somme des lignes avant remise globale. */
   totalHTBeforeGlobal: number
-  /** Montant de la remise globale en DT. */
+  /** Montant de la remise globale en DT, toujours exprimé en HT. */
   discountGlobal: number
+  /**
+   * Montant réellement déduit du TTC. Diffère de `discountGlobal` quand la
+   * remise est calculée sur le TTC : 10 DT de remise TTC HT 100 / TVA 19
+   * donnent `discountGlobal` 8,40 et `discountGlobalTTC` 10,000.
+   */
+  discountGlobalTTC: number
   /** Total HT après remise globale. */
   totalHT: number
   /** Découpage TVA par taux (base réduite proportionnellement). */
@@ -161,36 +181,86 @@ export function calculateGlobalDiscountAmount(
 /**
  * Calcule les totaux d'un document (devis ou facture).
  *
- * - Remise globale appliquée sur le total HT.
- * - La TVA est ensuite recalculée sur la base réduite, répartie
- *   proportionnellement entre les taux utilisés, chaque taux arrondi au
- *   millime (pour que la ventilation "TVA 19% : X DT, TVA 13% : Y DT"
- *   affichée dans le récapitulatif somme exactement au total TVA).
+ * - `discountBasis: 'HT'` (défaut) : remise globale appliquée sur le total HT,
+ *   la TVA est recalculée sur la base réduite, répartie proportionnellement
+ *   entre les taux utilisés, chaque taux arrondi au millime (pour que la
+ *   ventilation "TVA 19% : X DT, TVA 13% : Y DT" affichée dans le récapitulatif
+ *   somme exactement au total TVA).
+ * - `discountBasis: 'TTC'` : la remise est déduite du TTC, le HT et la TVA de
+ *   chaque taux sont déduits du TTC réduit (voir {@link DocumentTotals}).
+ *
+ * Dans les deux cas `totalHT + totalTVA + timbre === totalTTC` au millime et
+ * `totalHTBeforeGlobal - discountGlobal === totalHT`, invariants dont dépendent
+ * le PDF, le récapitulatif et le détail des documents.
  */
 export function calculateDocumentTotals(input: DocumentInput): DocumentTotals {
   const lines = input.lines.map((line) => calculateLineTotal(line))
 
   const totalHTBeforeGlobal = roundMoney(lines.reduce((sum, l) => sum + l.lineHT, 0))
-  const discountGlobal = calculateGlobalDiscountAmount(totalHTBeforeGlobal, input.globalDiscount)
-  const totalHT = roundMoney(totalHTBeforeGlobal - discountGlobal)
+  const totalTTCBeforeGlobal = roundMoney(lines.reduce((sum, l) => sum + l.lineTTC, 0))
 
-  // Base HT par taux AVANT remise globale (pour la répartition proportionnelle).
-  const basesBefore = new Map<number, number>()
-  for (const line of input.lines) {
-    const totals = calculateLineTotal(line)
+  // Bases HT et TTC par taux AVANT remise globale (répartition proportionnelle).
+  const basesBefore = new Map<number, { baseHT: number; baseTTC: number }>()
+  input.lines.forEach((line, i) => {
+    const totals = lines[i]
+    if (!totals) return
     const rate = toNumber(line.taxRate)
-    basesBefore.set(rate, (basesBefore.get(rate) ?? 0) + totals.lineHT)
-  }
+    const entry = basesBefore.get(rate) ?? { baseHT: 0, baseTTC: 0 }
+    entry.baseHT += totals.lineHT
+    entry.baseTTC += totals.lineTTC
+    basesBefore.set(rate, entry)
+  })
+  const groups = [...basesBefore.entries()].sort((a, b) => b[0] - a[0])
 
-  const ratio = totalHTBeforeGlobal > 0 ? totalHT / totalHTBeforeGlobal : 0
-  const vatBreakdown: RateBreakdown[] = [...basesBefore.entries()]
-    .sort((a, b) => b[0] - a[0])
-    .map(([rate, baseHT]) => {
-      const reducedBase = roundMoney(baseHT * ratio)
-      const tva = roundMoney(reducedBase * (rate / 100))
-      return { rate, baseHT: reducedBase, tva }
+  let totalHT: number
+  let vatBreakdown: RateBreakdown[]
+  let discountGlobalTTC: number
+
+  if (input.discountBasis === 'TTC') {
+    // Sens inversé : on part du TTC net et on en déduit le HT de chaque taux.
+    const discountOnTTC = calculateGlobalDiscountAmount(totalTTCBeforeGlobal, input.globalDiscount)
+    // Une remise supérieure au TTC (saisie abusive au POS) ne doit pas produire
+    // un document négatif : la base nette est ramenée à zéro.
+    const reducedTTC = roundMoney(Math.max(0, totalTTCBeforeGlobal - discountOnTTC))
+    const ttcRatio = totalTTCBeforeGlobal > 0 ? reducedTTC / totalTTCBeforeGlobal : 0
+
+    const reducedTTCByRate = groups.map(([, b]) => roundMoney(b.baseTTC * ttcRatio))
+
+    // Les arrondis au millime laissent parfois une dérive d'un centime entre la
+    // somme des bases TTC et le TTC net : on la réimpute sur le plus gros taux
+    // pour que la ventilation somme exactement au total.
+    const drift = roundMoney(reducedTTC - reducedTTCByRate.reduce((s, v) => s + v, 0))
+    if (reducedTTCByRate.length > 0 && drift !== 0) {
+      let largest = 0
+      for (let i = 1; i < reducedTTCByRate.length; i++) {
+        if ((reducedTTCByRate[i] ?? 0) > (reducedTTCByRate[largest] ?? 0)) largest = i
+      }
+      reducedTTCByRate[largest] = roundMoney((reducedTTCByRate[largest] ?? 0) + drift)
+    }
+
+    vatBreakdown = groups.map(([rate], i) => {
+      const groupTTC = reducedTTCByRate[i] ?? 0
+      const factor = 1 + rate / 100
+      const baseHT = factor > 0 ? roundMoney(groupTTC / factor) : groupTTC
+      return { rate, baseHT, tva: roundMoney(groupTTC - baseHT) }
     })
 
+    totalHT = roundMoney(vatBreakdown.reduce((sum, b) => sum + b.baseHT, 0))
+    discountGlobalTTC = discountOnTTC
+  } else {
+    const discountOnHT = calculateGlobalDiscountAmount(totalHTBeforeGlobal, input.globalDiscount)
+    totalHT = roundMoney(totalHTBeforeGlobal - discountOnHT)
+    const ratio = totalHTBeforeGlobal > 0 ? totalHT / totalHTBeforeGlobal : 0
+    vatBreakdown = groups.map(([rate, b]) => {
+      const reducedBase = roundMoney(b.baseHT * ratio)
+      return { rate, baseHT: reducedBase, tva: roundMoney(reducedBase * (rate / 100)) }
+    })
+    discountGlobalTTC = roundMoney(totalTTCBeforeGlobal - totalHT - roundMoney(vatBreakdown.reduce((s, b) => s + b.tva, 0)))
+  }
+
+  // Toujours exprimé en HT : c'est la base attendue par le stockage et l'affichage
+  // des documents, quelle que soit la base de saisie de la remise.
+  const discountGlobal = roundMoney(totalHTBeforeGlobal - totalHT)
   const totalTVA = roundMoney(vatBreakdown.reduce((sum, b) => sum + b.tva, 0))
   const timbreFiscal = roundMoney(toNumber(input.timbreFiscal ?? 0))
   const totalTTC = roundMoney(totalHT + totalTVA + timbreFiscal)
@@ -199,6 +269,7 @@ export function calculateDocumentTotals(input: DocumentInput): DocumentTotals {
     lines,
     totalHTBeforeGlobal,
     discountGlobal,
+    discountGlobalTTC,
     totalHT,
     vatBreakdown,
     totalTVA,

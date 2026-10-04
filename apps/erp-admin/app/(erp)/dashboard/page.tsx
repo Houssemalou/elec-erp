@@ -1,5 +1,4 @@
-import { getDashboardKpis, getMarginKpi } from '@elec/services'
-import { db } from '@elec/db'
+import { getDashboardKpis, getMarginKpi, getRevenueSeries } from '@elec/services'
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import {
@@ -59,16 +58,7 @@ export default async function DashboardPage() {
       label: d.toLocaleDateString('fr-FR', { month: 'short' }),
     }
   })
-  const monthlyMap = new Map(monthKeys.map((m) => [m.key, 0]))
-  const invoices = await db.invoice.findMany({
-    where: { validatedAt: { not: null } },
-    select: { totalTTC: true, validatedAt: true },
-  })
-  for (const inv of invoices) {
-    const d = inv.validatedAt as Date
-    const key = `${d.getFullYear()}-${d.getMonth()}`
-    if (monthlyMap.has(key)) monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + Number(inv.totalTTC))
-  }
+  const monthlyMap = await getRevenueSeries(monthKeys)
   const revenueSeries = monthKeys.map((m) => ({
     month: m.label,
     revenue: Math.round((monthlyMap.get(m.key) ?? 0) * 100) / 100,
@@ -110,7 +100,7 @@ export default async function DashboardPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Chiffre d'affaires (6 derniers mois)" subtitle="Factures validées" />
+          <CardHeader title="Chiffre d'affaires (6 derniers mois)" subtitle="Factures et ventes en caisse validées" />
           <div className="p-5">
             <RevenueChart data={revenueSeries} />
           </div>

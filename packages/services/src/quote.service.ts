@@ -32,6 +32,7 @@ export interface BuildLineRow {
   lineTTC: number
 }
 
+
 export async function buildLineRows(client: DbClient, lines: DocumentLineInput[]): Promise<BuildLineRow[]> {
   const rows: BuildLineRow[] = []
   for (const line of lines) {
@@ -48,7 +49,7 @@ export async function buildLineRows(client: DbClient, lines: DocumentLineInput[]
       sku: line.sku,
       designation: line.designation,
       quantity: Number(line.quantity),
-unitPriceHT: unitPriceHTFrom(line),
+      unitPriceHT: unitPriceHTFrom(line),
       unitPriceTTC: Number(line.unitPriceTTC ?? 0),
       discountType: (line.discountType as DiscountType | undefined) ?? null,
       discountValue: Number(line.discountValue ?? 0),

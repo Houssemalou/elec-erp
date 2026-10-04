@@ -62,6 +62,8 @@ interface DocumentFormProps {
   /** Affiche un bouton radio TVA (Avec / Sans) sur le devis. */
   showVatOption?: boolean
   defaultNonAssujettiTva?: boolean
+  /** Affiche le pied de page en TTC (facture d'achat) au lieu du HT (vente). */
+  totalsInTTC?: boolean
 }
 
 let lineSeq = 0
@@ -95,6 +97,7 @@ export function DocumentForm({
   defaultPartyAddress = '',
   showVatOption = false,
   defaultNonAssujettiTva = false,
+  totalsInTTC = false,
 }: DocumentFormProps) {
   const router = useRouter()
   const [lines, setLines] = useState<DocLine[]>(defaultLines)
@@ -167,6 +170,8 @@ export function DocumentForm({
     })
   }
 
+  // La colonne s'intitule « Total TTC » : c'est le TTC qui est saisi, donc c'est
+  // le TTC qui doit être affiché, jamais le HT déduit.
   const lineTotal = (l: DocLine) =>
     calculateLineTotal({
       quantity: Number(l.quantity || 0),
@@ -174,7 +179,7 @@ export function DocumentForm({
       discountType: l.discountType || null,
       discountValue: Number(l.discountValue || 0),
       taxRate: l.taxRate,
-    }).lineHT
+    }).lineTTC
 
   const previewTotals = calculateDocumentTotals({
     lines: lines.map((l) => ({
@@ -191,6 +196,8 @@ export function DocumentForm({
   const subtotalHT = previewTotals.totalHTBeforeGlobal
   const discountAmount = previewTotals.discountGlobal
   const totalHT = previewTotals.totalHT
+  const subtotalTTC = roundMoney(previewTotals.totalHTBeforeGlobal + previewTotals.totalTVA)
+  const totalTTC = roundMoney(previewTotals.totalHT + previewTotals.totalTVA)
 
   return (
     <form
@@ -464,16 +471,33 @@ export function DocumentForm({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[#2A2A2A] pt-4">
         <div className="text-sm">
-          <span className="text-white/50">Sous-total HT : </span>
-          <span className="font-semibold text-white">{money(subtotalHT)}</span>
-          {discountAmount > 0 ? (
+          {totalsInTTC ? (
             <>
-              <span className="ml-3 text-white/50">Remise : </span>
-              <span className="font-semibold text-red-400">− {money(discountAmount)}</span>
+              <span className="text-white/50">Sous-total TTC : </span>
+              <span className="font-semibold text-white">{money(subtotalTTC)}</span>
+              {discountAmount > 0 ? (
+                <>
+                  <span className="ml-3 text-white/50">Remise : </span>
+                  <span className="font-semibold text-red-400">− {money(discountAmount)}</span>
+                </>
+              ) : null}
+              <span className="ml-3 text-white/50">Total TTC : </span>
+              <span className="font-semibold text-accent-400">{money(totalTTC)}</span>
             </>
-          ) : null}
-          <span className="ml-3 text-white/50">Total HT : </span>
-          <span className="font-semibold text-accent-400">{money(totalHT)}</span>
+          ) : (
+            <>
+              <span className="text-white/50">Sous-total HT : </span>
+              <span className="font-semibold text-white">{money(subtotalHT)}</span>
+              {discountAmount > 0 ? (
+                <>
+                  <span className="ml-3 text-white/50">Remise : </span>
+                  <span className="font-semibold text-red-400">− {money(discountAmount)}</span>
+                </>
+              ) : null}
+              <span className="ml-3 text-white/50">Total HT : </span>
+              <span className="font-semibold text-accent-400">{money(totalHT)}</span>
+            </>
+          )}
         </div>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" disabled={pending || lines.length === 0}>

@@ -89,6 +89,8 @@ type SuccessResult = {
     number: string
     date: Date
     items: Array<{ name: string; quantity: number; unitPriceTTC: number; lineTTC: number }>
+    subtotalTTC: number
+    discountTTC: number
     totalTTC: number
     paymentMethod: 'CASH' | 'CARD'
   }
@@ -224,8 +226,11 @@ export default function PosTerminal({
     })),
     globalDiscount:
       discountType === 'NONE' ? null : { type: discountType, value: Number(discountValue || 0) },
+    // Le caissier saisit la remise en dinars sur le TTC affiché ; le HT et la
+    // TVA en découlent.
+    discountBasis: 'TTC',
   })
-  const discountAmount = totals.discountGlobal
+  const discountAmount = totals.discountGlobalTTC
   const totalHTAfterDiscount = totals.totalHT
   const totalTVA = totals.totalTVA
   const totalTTC = totals.totalTTC
@@ -294,6 +299,7 @@ export default function PosTerminal({
           lineTTC: item.priceTTC * item.quantity,
         }))
         const receiptTotalTTC = totalTTC
+        const receiptSubtotalTTC = subtotalTTC
 
         setSuccess({
           deliveryNoteId: res.deliveryNoteId,
@@ -308,6 +314,8 @@ export default function PosTerminal({
             number: res.deliveryNoteNumber ?? '',
             date: new Date(),
             items: receiptItems,
+            subtotalTTC: receiptSubtotalTTC,
+            discountTTC: discountAmount,
             totalTTC: receiptTotalTTC,
             paymentMethod,
           } : undefined,
@@ -632,7 +640,7 @@ export default function PosTerminal({
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-red-400">
-                <span>Remise</span>
+                <span>Remise TTC</span>
                 <span>-{money(discountAmount)}</span>
               </div>
             )}
@@ -723,7 +731,7 @@ export default function PosTerminal({
           </div>
           {discountAmount > 0 && (
             <div className="mt-1 text-[11px] text-red-400">
-              Remise : -{money(discountAmount)}
+              Remise TTC : -{money(discountAmount)}
             </div>
           )}
 

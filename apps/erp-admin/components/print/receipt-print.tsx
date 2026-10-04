@@ -13,6 +13,10 @@ export interface ReceiptData {
   number: string
   date: Date
   items: ReceiptLine[]
+  /** Somme des lignes avant remise. */
+  subtotalTTC?: number
+  /** Remise déduite du TTC, en DT. */
+  discountTTC?: number
   totalTTC: number
   paymentMethod: 'CASH' | 'CARD'
 }
@@ -72,10 +76,23 @@ export function ReceiptPrint({ data }: { data: ReceiptData }) {
 
       <div className="border-t border-dashed border-slate-300 my-1.5" />
 
-      {/* Total */}
-      <div className="flex justify-between font-bold text-[10px]">
-        <span>TOTAL TTC</span>
-        <span>{fmt(data.totalTTC)}</span>
+      {/* Totaux : le sous-total et la remise TTC expliquent l'écart avec le
+          total affiché quand une remise a été appliquée. */}
+      <div className="space-y-0.5 text-[9px]">
+        <div className="flex justify-between text-slate-600">
+          <span>Sous-total TTC</span>
+          <span>{fmt(data.subtotalTTC ?? data.totalTTC)}</span>
+        </div>
+        {(data.discountTTC ?? 0) > 0 && (
+          <div className="flex justify-between text-slate-600">
+            <span>Remise</span>
+            <span>-{fmt(data.discountTTC ?? 0)}</span>
+          </div>
+        )}
+        <div className="flex justify-between font-bold text-[10px]">
+          <span>TOTAL TTC</span>
+          <span>{fmt(data.totalTTC)}</span>
+        </div>
       </div>
 
       {/* Payment */}

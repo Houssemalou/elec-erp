@@ -87,6 +87,10 @@ export async function createPosSale(input: CreatePosSaleInput): Promise<PosSaleR
       globalDiscount: input.globalDiscountType
         ? { type: input.globalDiscountType, value: input.globalDiscountValue ?? 0 }
         : null,
+      // Au POS le caissier saisit une remise en dinars sur le TTC affiché au
+      // client. `discountGlobal` reste exprimé en HT : la facture générée
+      // porte donc une remise cohérente avec son propre récapitulatif.
+      discountBasis: 'TTC',
       timbreFiscal: 0,
     })
 
