@@ -17,7 +17,8 @@ import {
   Monitor,
   Landmark,
   Wallet,
-  TrendingUp,
+  CalendarCheck,
+  HandCoins,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -44,6 +45,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ALL_STAFF },
       { href: '/finance', label: 'Finance', icon: PiggyBank, roles: MANAGER },
       { href: '/depenses', label: 'Dépenses', icon: Wallet, roles: MANAGER },
+      { href: '/clotures', label: 'Clôtures', icon: CalendarCheck, roles: MANAGER },
+      { href: '/creances', label: 'Créances', icon: HandCoins, roles: MANAGER },
     ],
   },
   {

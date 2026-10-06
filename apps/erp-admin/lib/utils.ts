@@ -17,6 +17,29 @@ export function formatDate(date: Date | string | null | undefined): string {
   return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/**
+ * Date au format `YYYY-MM-DD` en heure locale.
+ *
+ * `toISOString()` bascule en UTC : à Tunis (UTC+1) un lundi 00:00 ressort
+ * dimanche. Les semaines de clôture sont des lundis, ce décalage envoyerait la
+ * semaine précédente.
+ */
+export function dateInputValue(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const month = `${d.getMonth() + 1}`.padStart(2, '0')
+  const day = `${d.getDate()}`.padStart(2, '0')
+  return `${d.getFullYear()}-${month}-${day}`
+}
+
+/**
+ * Convertit une valeur de `<input type="date">` en Date locale à 00:00.
+ * `new Date('2026-02-02')` serait interprété en UTC.
+ */
+export function parseDateInput(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number)
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1)
+}
+
 export const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Brouillon',
   SENT: 'Envoyé',

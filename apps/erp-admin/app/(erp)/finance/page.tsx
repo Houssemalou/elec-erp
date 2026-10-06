@@ -1,8 +1,19 @@
+import Link from 'next/link'
 import { PageHeader, Card, CardHeader, Badge, Table, THead, TR, TH, TD } from '@/components/ui'
 import { RevenueChart } from '@/components/charts/revenue-chart'
-import { getFinanceSummary } from '@elec/services'
-import { money } from '@/lib/utils'
-import { Wallet, TrendingUp, ArrowDownLeft, ArrowUpRight, Receipt, PackageSearch, PiggyBank, Percent } from 'lucide-react'
+import { getFinanceSummary, getReceivablesOverview, listWeeklyClosings, weeklyGain } from '@elec/services'
+import { money, formatDate, dateInputValue } from '@/lib/utils'
+import {
+  Wallet,
+  TrendingUp,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Receipt,
+  PackageSearch,
+  PiggyBank,
+  Percent,
+  CalendarCheck,
+} from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +51,11 @@ function KpiCard({
 }
 
 export default async function FinancePage() {
-  const s = await getFinanceSummary()
+  const [s, receivables, closings] = await Promise.all([
+    getFinanceSummary(),
+    getReceivablesOverview(),
+    listWeeklyClosings(6),
+  ])
 
   const collectionRate = s.revenueTTC > 0 ? Math.round((s.collectedTTC / s.revenueTTC) * 100) : 0
   const gainTone = s.gainTTC >= 0 ? 'green' : 'red'
@@ -77,8 +92,12 @@ export default async function FinancePage() {
         />
         <KpiCard
           label="Créances clients"
-          value={money(s.receivableTTC)}
-          sub="Factures validées non encaissées"
+          value={money(receivables.totals.remainingTTC)}
+          sub={
+            receivables.totals.overdueTTC > 0
+              ? `Dont ${money(receivables.totals.overdueTTC)} échues`
+              : 'Factures et créances libres non soldées'
+          }
           icon={<ArrowDownLeft className="h-5 w-5" />}
           tone="amber"
         />
@@ -153,6 +172,108 @@ export default async function FinancePage() {
                   <span className="text-white/50">Total</span>
                   <span className="font-bold text-accent-400">{money(s.expensesTTC)}</span>
                 </li>
+              </ul>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader
+            title="Créances clients"
+            subtitle="Factures et créances libres regroupées par client"
+            action={
+              <Link href="/creances" className="text-xs text-accent-400 hover:text-accent-300">
+                Gérer
+              </Link>
+            }
+          />
+          <Table>
+            <THead>
+              <TR>
+                <TH>Client</TH>
+                <TH className="text-center">Factures</TH>
+                <TH className="text-center">Créances</TH>
+                <TH className="text-right">Reste dû TTC</TH>
+              </TR>
+            </THead>
+            <tbody>
+              {receivables.byCustomer.slice(0, 8).map((c) => (
+                <TR key={c.name}>
+                  <TD className="font-medium text-white">
+                    {c.name}
+                    {c.overdueTTC > 0 ? (
+                      <span className="ml-2 text-xs text-red-400">{money(c.overdueTTC)} échus</span>
+                    ) : null}
+                  </TD>
+                  <TD className="text-center text-white/60">{c.invoices}</TD>
+                  <TD className="text-center text-white/60">{c.receivables}</TD>
+                  <TD className="text-right font-semibold text-white">{money(c.remaining)}</TD>
+                </TR>
+              ))}
+              {receivables.byCustomer.length === 0 ? (
+                <TR>
+                  <TD colSpan={4} className="py-12 text-center text-white/40">
+                    Aucune créance en cours
+                  </TD>
+                </TR>
+              ) : null}
+            </tbody>
+          </Table>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Clôtures hebdomadaires"
+            subtitle="Bilan saisi manuellement, gain ou perte"
+            action={
+              <Link href="/clotures" className="text-xs text-accent-400 hover:text-accent-300">
+                Ouvrir
+              </Link>
+            }
+          />
+          <div className="p-5">
+            {closings.length === 0 ? (
+              <p className="text-sm text-white/40">
+                Aucune clôture enregistrée.{' '}
+                <Link href="/clotures" className="text-accent-400 hover:text-accent-300">
+                  Saisir la semaine
+                </Link>
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {closings.map((w) => {
+                  const wGain = weeklyGain({
+                    revenueTTC: Number(w.revenueTTC),
+                    purchasesTTC: Number(w.purchasesTTC),
+                    expensesTTC: Number(w.expensesTTC),
+                    otherExpensesTTC: Number(w.otherExpensesTTC),
+                  })
+                  return (
+                    <li key={w.id}>
+                      <Link
+                        href={`/clotures?semaine=${dateInputValue(w.weekStart)}`}
+                        className="flex items-center justify-between rounded-lg border border-[#2A2A2A] px-3 py-2 hover:bg-white/5"
+                      >
+                        <span className="flex items-center gap-2 text-sm text-white/70">
+                          <CalendarCheck className="h-4 w-4 text-white/40" />
+                          {formatDate(w.weekStart)}
+                        </span>
+                        <span className="flex items-center gap-3">
+                          <span
+                            className={`text-sm font-semibold ${wGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                          >
+                            {wGain >= 0 ? 'Gain' : 'Perte'} {money(Math.abs(wGain))}
+                          </span>
+                          <Badge tone={w.closedAt ? 'green' : 'amber'}>
+                            {w.closedAt ? 'Clôturée' : 'Ouverte'}
+                          </Badge>
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>

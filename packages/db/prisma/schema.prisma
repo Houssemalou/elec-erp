@@ -179,6 +179,8 @@ model User {
   creditNotes     CreditNote[]     @relation("CreditNoteCreator")
   deliveryNotes   DeliveryNote[]
   expenses        Expense[]        @relation("ExpenseCreator")
+  receivables     Receivable[]     @relation("ReceivableCreator")
+  weeklyClosings  WeeklyClosing[]  @relation("WeeklyClosingCreator")
 
   @@index([role])
   @@map("users")
@@ -503,6 +505,7 @@ model Customer {
   creditNotes  CreditNote[]
   deliveryNotes DeliveryNote[]
   onlineOrders OnlineOrder[]
+  receivables  Receivable[]
 
   @@index([type])
   @@index([active])
@@ -759,6 +762,7 @@ model DeliveryNoteItem {
 model Payment {
   id          String        @id @default(cuid())
   invoiceId   String?
+  receivableId String?
   amount      Decimal       @db.Decimal(12, 3)
   method      PaymentMethod
   reference   String?
@@ -766,10 +770,12 @@ model Payment {
   createdById String
   note        String?
 
-  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
-  createdBy User    @relation(fields: [createdById], references: [id])
+  invoice    Invoice?    @relation(fields: [invoiceId], references: [id])
+  receivable Receivable? @relation(fields: [receivableId], references: [id])
+  createdBy  User        @relation(fields: [createdById], references: [id])
 
   @@index([invoiceId])
+  @@index([receivableId])
   @@index([receivedAt])
   @@map("payments")
 }
@@ -916,6 +922,63 @@ enum ExpenseCategory {
   FOURNITURES
   IMPOTS
   AUTRE
+}
+
+/// État d'une créance client libre (non adossée à une facture).
+enum ReceivableStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+/// Clôture hebdomadaire : bilan saisi à la main pour une semaine de lundi à
+/// lundi, puis verrouillé. `gainTTC` est négatif en cas de perte.
+model WeeklyClosing {
+  id                String    @id @default(cuid())
+  number            String    @unique // SEM-YYYY-NN
+  weekStart         DateTime  @unique // Lundi 00:00, début de la semaine
+  weekEnd           DateTime // Lundi suivant 00:00 (exclusive)
+  revenueTTC        Decimal   @db.Decimal(12, 3) @default(0)
+  purchasesTTC      Decimal   @db.Decimal(12, 3) @default(0)
+  expensesTTC       Decimal   @db.Decimal(12, 3) @default(0)
+  otherExpensesTTC  Decimal   @db.Decimal(12, 3) @default(0)
+  notes             String?
+  closedAt          DateTime? // Renseigné au verrouillage, vide tant que la semaine est ouverte
+  createdById       String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  createdBy User @relation("WeeklyClosingCreator", fields: [createdById], references: [id])
+
+  @@map("weekly_closings")
+}
+
+/// Créance saisie à la main : vente au comptant non facturée, avance sur
+/// commande, dette d'un client. Elle s'ajoute aux créances issues des factures
+/// non soldées, elle ne les remplace pas.
+model Receivable {
+  id           String           @id @default(cuid())
+  number       String           @unique // CR-YYYY-######
+  customerId   String?
+  customerName String
+  amountTTC    Decimal          @db.Decimal(12, 3)
+  paidAmount   Decimal          @db.Decimal(12, 3) @default(0)
+  dueDate      DateTime?
+  status       ReceivableStatus @default(OPEN)
+  notes        String?
+  createdById  String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdBy User      @relation("ReceivableCreator", fields: [createdById], references: [id])
+  payments  Payment[]
+
+  @@index([status])
+  @@index([dueDate])
+  @@index([customerId])
+  @@map("receivables")
 }
 
 /// Dépense saisie en TTC : l'entreprise n'étant pas assujettie à la TVA, le

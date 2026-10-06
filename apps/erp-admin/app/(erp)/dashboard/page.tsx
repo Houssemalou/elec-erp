@@ -91,9 +91,9 @@ export default async function DashboardPage() {
           icon={<PackageX className="h-5 w-5" />}
         />
         <KpiCard
-          label="Gain TTC"
+          label="Gain brut TTC"
           value={money(margin.gainTTC)}
-          sub={`Marge ${margin.marginRate.toFixed(1)} % · coût de revient ${money(margin.totalCost)}`}
+          sub={`Marge ${margin.marginRate.toFixed(1)} % · coût de revient ${money(margin.totalCost)} · hors dépenses`}
           icon={<Percent className="h-5 w-5" />}
         />
       </div>

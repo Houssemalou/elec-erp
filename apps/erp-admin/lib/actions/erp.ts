@@ -9,6 +9,7 @@ import {
   OnlineOrderStatus,
   type ExpenseCategory,
   type PaymentMethod,
+  type ReceivableStatus,
 } from '@elec/db'
 import {
   StockMovementType,
@@ -43,6 +44,16 @@ import {
   updateExpense as updateExpenseService,
   deleteExpense as deleteExpenseService,
   type ExpenseInput,
+  createReceivable,
+  updateReceivable,
+  deleteReceivable,
+  registerReceivablePayment,
+  saveWeeklyClosing,
+  closeWeeklyClosing,
+  reopenWeeklyClosing,
+  deleteWeeklyClosing,
+  type ReceivableInput,
+  type WeeklyClosingInput,
 } from '@elec/services'
 import { roundMoney, unitPriceHTFrom } from '@elec/contracts'
 import { requireRole, ADMIN_ROLE, MANAGER_ROLES, STAFF_ROLES } from '@/lib/session'
@@ -73,6 +84,20 @@ function numOrNull(fd: FormData, key: string): number | null {
   if (!s) return null
   const v = parseFloat(s)
   return Number.isFinite(v) ? v : null
+}
+
+/**
+ * Date issue d'un `<input type="date">` (format `YYYY-MM-DD`).
+ *
+ * `new Date('2026-02-02')` est interprété en UTC : à Tunis le lundi deviendrait
+ * dimanche. On force donc une lecture en heure locale.
+ */
+function dateOrNull(fd: FormData, key: string): Date | null {
+  const s = str(fd, key)
+  if (!s) return null
+  const [y, m, d] = s.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
 }
 
 /** Enregistre le nom de société (client commercial) saisi dans la section client. */
@@ -1228,6 +1253,195 @@ export async function deleteExpense(id: string): Promise<ActionResult> {
   try {
     await deleteExpenseService(id)
     revalidateAfterExpenseChange()
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+// ============================================================================
+// Créances clients — saisie libre, encaissement, suppression
+// ============================================================================
+
+const RECEIVABLE_STATUSES: ReceivableStatus[] = ['OPEN', 'PARTIALLY_PAID', 'PAID', 'CANCELLED']
+const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'EDAHABIA', 'ONLINE']
+
+/** Valide le payload d'une créance libre. Partagé par création et mise à jour. */
+function parseReceivable(fd: FormData): { ok: true; data: ReceivableInput } | { ok: false; error: string } {
+  const customerName = str(fd, 'customerName')
+  if (!customerName) return { ok: false, error: 'Le nom du client est obligatoire' }
+
+  const amountTTC = num(fd, 'amountTTC')
+  if (!(amountTTC > 0)) return { ok: false, error: 'Le montant doit être supérieur à zéro' }
+
+  return {
+    ok: true,
+    data: {
+      customerName,
+      customerId: str(fd, 'customerId') || null,
+      amountTTC,
+      dueDate: dateOrNull(fd, 'dueDate'),
+      notes: str(fd, 'notes') || null,
+    },
+  }
+}
+
+function revalidateAfterReceivableChange(extraPath?: string) {
+  revalidatePath('/creances')
+  revalidatePath('/finance')
+  if (extraPath) revalidatePath(extraPath)
+}
+
+export async function createReceivableAction(fd: FormData): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  const parsed = parseReceivable(fd)
+  if (!parsed.ok) return { success: false, error: parsed.error }
+
+  try {
+    const receivable = await createReceivable(parsed.data, user.id)
+    revalidateAfterReceivableChange()
+    return { success: true, id: receivable.id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function updateReceivableAction(id: string, fd: FormData): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  const parsed = parseReceivable(fd)
+  if (!parsed.ok) return { success: false, error: parsed.error }
+
+  try {
+    await updateReceivable(id, parsed.data)
+    revalidateAfterReceivableChange(`/creances/${id}/edit`)
+    return { success: true, id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function registerReceivablePaymentAction(fd: FormData): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+
+  const receivableId = str(fd, 'receivableId')
+  if (!receivableId) return { success: false, error: 'Créance introuvable' }
+
+  const method = str(fd, 'method') as PaymentMethod
+  if (!PAYMENT_METHODS.includes(method)) return { success: false, error: 'Mode de paiement invalide' }
+
+  try {
+    await registerReceivablePayment({
+      receivableId,
+      amount: num(fd, 'amount'),
+      method,
+      receivedAt: dateOrNull(fd, 'receivedAt'),
+      reference: str(fd, 'reference') || null,
+      note: str(fd, 'note') || null,
+      createdById: user.id,
+    })
+    revalidateAfterReceivableChange(`/creances/${receivableId}`)
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function deleteReceivableAction(id: string): Promise<ActionResult> {
+  const user = await clean(ADMIN_ROLE)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await deleteReceivable(id)
+    revalidateAfterReceivableChange()
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+// ============================================================================
+// Clôtures hebdomadaires — saisie manuelle, verrouillage, réouverture
+// ============================================================================
+
+/** Valide le bilan saisi. Les montants sont en TTC et saisis à la main. */
+function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput } | { ok: false; error: string } {
+  const weekStart = dateOrNull(fd, 'weekStart') ?? dateOrNull(fd, 'issueDate')
+  if (!weekStart) return { ok: false, error: 'La semaine est obligatoire' }
+
+  const revenueTTC = num(fd, 'revenueTTC')
+  const purchasesTTC = num(fd, 'purchasesTTC')
+  const expensesTTC = num(fd, 'expensesTTC')
+  const otherExpensesTTC = num(fd, 'otherExpensesTTC')
+
+  if (revenueTTC < 0 || purchasesTTC < 0 || expensesTTC < 0 || otherExpensesTTC < 0) {
+    return { ok: false, error: 'Les montants ne peuvent pas être négatifs' }
+  }
+
+  return {
+    ok: true,
+    data: {
+      weekStart,
+      revenueTTC,
+      purchasesTTC,
+      expensesTTC,
+      otherExpensesTTC,
+      notes: str(fd, 'notes') || null,
+    },
+  }
+}
+
+export async function saveWeeklyClosingAction(fd: FormData): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  const parsed = parseWeeklyClosing(fd)
+  if (!parsed.ok) return { success: false, error: parsed.error }
+
+  try {
+    const closing = await saveWeeklyClosing(parsed.data, user.id)
+    revalidatePath('/clotures')
+    revalidatePath('/finance')
+    return { success: true, id: closing.id }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function closeWeeklyClosingAction(id: string): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await closeWeeklyClosing(id)
+    revalidatePath('/clotures')
+    revalidatePath('/finance')
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function reopenWeeklyClosingAction(id: string): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await reopenWeeklyClosing(id)
+    revalidatePath('/clotures')
+    revalidatePath('/finance')
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function deleteWeeklyClosingAction(id: string): Promise<ActionResult> {
+  const user = await clean(ADMIN_ROLE)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    await deleteWeeklyClosing(id)
+    revalidatePath('/clotures')
+    revalidatePath('/finance')
     return { success: true }
   } catch (e) {
     return { success: false, error: (e as Error).message }

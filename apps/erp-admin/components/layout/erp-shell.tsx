@@ -21,6 +21,8 @@ const OPEN_SECTIONS = new Set([
   '/factures',
   '/avoirs',
   '/depenses',
+  '/clotures',
+  '/creances',
 ])
 const OPEN_GROUPS = new Set(['Ventes', 'Catalogue & stock'])
 
