@@ -26,11 +26,14 @@ export interface WeeklyClosingFormData {
  */
 export function WeeklyClosingForm({
   closing,
+  defaultWeekStart,
   action,
   closeAction,
   reopenAction,
 }: {
   closing: WeeklyClosingFormData | null
+  /** Lundi proposé quand aucune clôture n'existe encore (ex. semaine en retard). */
+  defaultWeekStart: Date
   action: (fd: FormData) => Promise<{ success: boolean; error?: string }>
   closeAction: (id: string) => Promise<{ success: boolean; error?: string }>
   reopenAction: (id: string) => Promise<{ success: boolean; error?: string }>
@@ -39,6 +42,7 @@ export function WeeklyClosingForm({
   const [error, setError] = useState<string>()
   const [pending, startTransition] = useTransition()
 
+  const [weekStart, setWeekStart] = useState(dateInputValue(closing?.weekStart ?? defaultWeekStart))
   const [revenue, setRevenue] = useState(closing?.revenueTTC ?? '')
   const [purchases, setPurchases] = useState(closing?.purchasesTTC ?? '')
   const [expenses, setExpenses] = useState(closing?.expensesTTC ?? '')
@@ -52,6 +56,14 @@ export function WeeklyClosingForm({
     () => Math.round((num(revenue) - num(purchases) - num(expenses) - num(other)) * 1000) / 1000,
     [revenue, purchases, expenses, other],
   )
+
+  // Le lundi saisi borne la semaine : on affiche le dimanche correspondant.
+  const weekEndLabel = useMemo(() => {
+    const [y, m, d] = weekStart.split('-').map(Number)
+    if (!y || !m || !d) return ''
+    const end = new Date(y, m - 1, d + 6)
+    return end.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+  }, [weekStart])
 
   const run = (fn: () => Promise<{ success: boolean; error?: string }>) => {
     setError(undefined)
@@ -84,6 +96,25 @@ export function WeeklyClosingForm({
         }}
       >
         {closing ? <input type="hidden" name="weekStart" value={dateInputValue(closing.weekStart)} /> : null}
+
+        {closing ? null : (
+          <div className="rounded-lg border border-[#2A2A2A] bg-[#151515] p-4">
+            <Label htmlFor="weekStart">Semaine à clôturer (lundi) *</Label>
+            <Input
+              id="weekStart"
+              name="weekStart"
+              type="date"
+              required
+              value={weekStart}
+              onChange={(e) => setWeekStart(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-white/40">
+              {weekEndLabel
+                ? `Du lundi saisi au dimanche ${weekEndLabel}. Choisissez une date passée pour régulariser une semaine en retard.`
+                : 'Sélectionnez le lundi de la semaine à clôturer.'}
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

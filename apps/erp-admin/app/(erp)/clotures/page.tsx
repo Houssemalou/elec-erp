@@ -22,7 +22,8 @@ export default async function CloturesPage({
 
   // La semaine demandée, ou la semaine dernière (celle qui est close quand on
   // travaille en début de semaine).
-  const reference = params.semaine ? parseDateInput(params.semaine) : new Date(Date.now() - 7 * 86400000)
+  const latestMonday = mondayOf(new Date(Date.now() - 7 * 86400000))
+  const reference = params.semaine ? parseDateInput(params.semaine) : latestMonday
   const [current, history] = await Promise.all([getWeeklyClosingByWeek(reference), listWeeklyClosings()])
   const weekStart = current?.weekStart ?? mondayOf(reference)
   const weekEnd = new Date(weekStart.getTime() + 6 * 86400000)
@@ -51,10 +52,10 @@ export default async function CloturesPage({
               subtitle="Les montants sont saisis à la main, en TTC"
               action={
                 <Link
-                  href={`/clotures?semaine=${dateInputValue(weekStart)}`}
+                  href={`/clotures?semaine=${dateInputValue(latestMonday)}`}
                   className="text-xs text-white/50 hover:text-white"
                 >
-                  Cette semaine
+                  Semaine précédente
                 </Link>
               }
             />
@@ -111,6 +112,7 @@ export default async function CloturesPage({
                   action={saveWeeklyClosingAction}
                   closeAction={closeWeeklyClosingAction}
                   reopenAction={reopenWeeklyClosingAction}
+                  defaultWeekStart={weekStart}
                 />
               )}
             </div>
