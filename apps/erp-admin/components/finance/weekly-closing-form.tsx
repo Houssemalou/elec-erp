@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Save, Lock } from 'lucide-react'
+import { Loader2, Save, Lock, RefreshCw } from 'lucide-react'
 import { Button, Input, Label } from '@/components/ui'
 import { money, dateInputValue } from '@/lib/utils'
 import { startActionLoader, stopActionLoader } from '@/lib/action-events'
@@ -14,19 +14,24 @@ export interface WeeklyClosingFormData {
   purchasesTTC: string
   expensesTTC: string
   otherExpensesTTC: string
+  costOfGoodsTTC: string
   notes: string
 }
 
 /**
- * Saisie manuelle du bilan hebdomadaire, puis verrouillage.
+ * Saisie du bilan hebdomadaire, puis verrouillage.
  *
- * Les quatre montants sont saisis en TTC : le résultat est calculé ici, la base
- * ne le recalcule pas. La clôture est une action séparée pour ne pas verrouiller
- * une semaine par mégarde.
+ * Le chiffre d'affaires et le coût de revient sont pré-remplis automatiquement
+ * à partir des ventes de la semaine, mais restent modifiables. La marge brute
+ * (CA − coût de revient) et le résultat net (CA − achats − dépenses − autres)
+ * sont recalculés ici, la base ne les recalcule pas. La clôture est une action
+ * séparée pour ne pas verrouiller une semaine par mégarde.
  */
 export function WeeklyClosingForm({
   closing,
   defaultWeekStart,
+  auto,
+  autoValuesAction,
   action,
   closeAction,
   reopenAction,
@@ -34,6 +39,16 @@ export function WeeklyClosingForm({
   closing: WeeklyClosingFormData | null
   /** Lundi proposé quand aucune clôture n'existe encore (ex. semaine en retard). */
   defaultWeekStart: Date
+  /** Valeurs calculées automatiquement à partir des ventes de la semaine. */
+  auto: { revenueTTC: number; costOfGoodsTTC: number; missingCostLines: number }
+  /** Recalcule les valeurs automatiques pour le lundi choisi. */
+  autoValuesAction: (weekStart: string) => Promise<{
+    success: boolean
+    error?: string
+    revenueTTC?: number
+    costOfGoodsTTC?: number
+    missingCostLines?: number
+  }>
   action: (fd: FormData) => Promise<{ success: boolean; error?: string }>
   closeAction: (id: string) => Promise<{ success: boolean; error?: string }>
   reopenAction: (id: string) => Promise<{ success: boolean; error?: string }>
@@ -42,11 +57,16 @@ export function WeeklyClosingForm({
   const [error, setError] = useState<string>()
   const [pending, startTransition] = useTransition()
 
+  const [autoRevenue, setAutoRevenue] = useState(String(auto.revenueTTC))
+  const [autoCost, setAutoCost] = useState(String(auto.costOfGoodsTTC))
+  const [missing, setMissing] = useState(auto.missingCostLines)
+
   const [weekStart, setWeekStart] = useState(dateInputValue(closing?.weekStart ?? defaultWeekStart))
-  const [revenue, setRevenue] = useState(closing?.revenueTTC ?? '')
+  const [revenue, setRevenue] = useState(closing?.revenueTTC ?? String(auto.revenueTTC))
   const [purchases, setPurchases] = useState(closing?.purchasesTTC ?? '')
   const [expenses, setExpenses] = useState(closing?.expensesTTC ?? '')
   const [other, setOther] = useState(closing?.otherExpensesTTC ?? '')
+  const [costOfGoods, setCostOfGoods] = useState(closing?.costOfGoodsTTC ?? String(auto.costOfGoodsTTC))
 
   const num = (v: string) => {
     const n = parseFloat(v)
@@ -56,6 +76,30 @@ export function WeeklyClosingForm({
     () => Math.round((num(revenue) - num(purchases) - num(expenses) - num(other)) * 1000) / 1000,
     [revenue, purchases, expenses, other],
   )
+  const margin = useMemo(
+    () => Math.round((num(revenue) - num(costOfGoods)) * 1000) / 1000,
+    [revenue, costOfGoods],
+  )
+  const resetToAuto = () => {
+    setRevenue(autoRevenue)
+    setCostOfGoods(autoCost)
+  }
+  // Changer de semaine recalcule les valeurs automatiques (création seulement).
+  const onWeekStartChange = (value: string) => {
+    setWeekStart(value)
+    if (closing || !value) return
+    startTransition(async () => {
+      const res = await autoValuesAction(value)
+      if (!res.success) return
+      const rev = String(res.revenueTTC ?? 0)
+      const cost = String(res.costOfGoodsTTC ?? 0)
+      setAutoRevenue(rev)
+      setAutoCost(cost)
+      setMissing(res.missingCostLines ?? 0)
+      setRevenue(rev)
+      setCostOfGoods(cost)
+    })
+  }
 
   // Le lundi saisi borne la semaine : on affiche le dimanche correspondant.
   const weekEndLabel = useMemo(() => {
@@ -106,7 +150,7 @@ export function WeeklyClosingForm({
               type="date"
               required
               value={weekStart}
-              onChange={(e) => setWeekStart(e.target.value)}
+              onChange={(e) => onWeekStartChange(e.target.value)}
             />
             <p className="mt-1 text-xs text-white/40">
               {weekEndLabel
@@ -130,7 +174,34 @@ export function WeeklyClosingForm({
               onChange={(e) => setRevenue(e.target.value)}
               placeholder="0,000"
             />
+            <p className="mt-1 text-xs text-white/40">Pré-rempli avec les ventes de la semaine (modifiable).</p>
           </div>
+          <div>
+            <Label htmlFor="costOfGoodsTTC">Prix de revient TTC des articles vendus *</Label>
+            <Input
+              id="costOfGoodsTTC"
+              name="costOfGoodsTTC"
+              type="number"
+              step="0.001"
+              min="0"
+              required
+              value={costOfGoods}
+              onChange={(e) => setCostOfGoods(e.target.value)}
+              placeholder="0,000"
+            />
+            <p className="mt-1 text-xs text-white/40">
+              Coût d&apos;achat TTC des articles vendus (modifiable).
+              {missing > 0 ? (
+                <span className="text-amber-400">
+                  {' '}
+                  {missing} ligne(s) sans prix de revient : valeur partielle.
+                </span>
+              ) : null}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="purchasesTTC">Achats TTC *</Label>
             <Input
@@ -145,9 +216,6 @@ export function WeeklyClosingForm({
               placeholder="0,000"
             />
           </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="expensesTTC">Dépenses TTC *</Label>
             <Input
@@ -162,6 +230,9 @@ export function WeeklyClosingForm({
               placeholder="0,000"
             />
           </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="otherExpensesTTC">Autres dépenses TTC</Label>
             <Input
@@ -174,6 +245,12 @@ export function WeeklyClosingForm({
               onChange={(e) => setOther(e.target.value)}
               placeholder="0,000"
             />
+          </div>
+          <div className="flex items-end">
+            <Button type="button" variant="outline" onClick={resetToAuto}>
+              <RefreshCw className="h-4 w-4" />
+              Recalculer CA et prix de revient
+            </Button>
           </div>
         </div>
 
@@ -189,11 +266,19 @@ export function WeeklyClosingForm({
           />
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 py-3">
-          <span className="text-sm text-white/60">Résultat de la semaine</span>
-          <span className={`font-display text-lg font-bold ${gain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {gain >= 0 ? 'Gain' : 'Perte'} : {money(Math.abs(gain))}
-          </span>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 py-3">
+            <span className="text-sm text-white/60">Marge brute TTC (CA − prix de revient)</span>
+            <span className={`font-display text-lg font-bold ${margin >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {margin >= 0 ? 'Gain' : 'Perte'} : {money(Math.abs(margin))}
+            </span>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 py-3">
+            <span className="text-sm text-white/60">Résultat net (CA − achats − dépenses − autres)</span>
+            <span className={`font-display text-lg font-bold ${gain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {gain >= 0 ? 'Gain' : 'Perte'} : {money(Math.abs(gain))}
+            </span>
+          </div>
         </div>
 
         <Button type="submit" disabled={pending}>

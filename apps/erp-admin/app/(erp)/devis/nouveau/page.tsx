@@ -27,6 +27,7 @@ export default async function NewQuotePage() {
           dateLabel="Valide jusqu&apos;au"
           dateName="validUntil"
           defaultConditions=""
+          targetPriceMode
         />
       </Card>
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPosSaleAction } from '@/lib/actions/erp'
 import { calculateDocumentTotals, roundMoney } from '@elec/contracts'
@@ -74,6 +74,62 @@ function costTTC(costPrice: number | null, taxRate: number): number | null {
 /** Prix affiché au POS : précision au millime, comme la fiche produit. */
 function priceLabel(value: number): string {
   return `${money(value)} DT`
+}
+
+/**
+ * Quantité éditable directement : le caissier peut taper la quantité (utile
+ * pour les grandes quantités) sans passer par les boutons +/−. La valeur est
+ * validée au blur ou sur Entrée.
+ */
+function QtyInput({
+  value,
+  max,
+  onCommit,
+}: {
+  value: number
+  max: number
+  onCommit: (qty: number) => void
+}) {
+  const [draft, setDraft] = useState(String(value))
+
+  useEffect(() => {
+    setDraft(String(value))
+  }, [value])
+
+  const commit = () => {
+    const n = Number(draft)
+    if (!draft.trim() || !Number.isFinite(n) || n <= 0) {
+      setDraft(String(value))
+      return
+    }
+    if (n > max) {
+      onCommit(n)
+      setDraft(String(value))
+      return
+    }
+    onCommit(n)
+  }
+
+  return (
+    <input
+      type="number"
+      min="0"
+      step="any"
+      inputMode="decimal"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commit()
+        }
+      }}
+      className="w-14 bg-transparent px-1 text-center text-sm font-medium text-white focus:outline-none"
+      aria-label="Quantité"
+    />
+  )
 }
 
 type SuccessResult = {
@@ -613,7 +669,11 @@ export default function PosTerminal({
                         >
                           <Minus className="h-3 w-3" />
                         </button>
-                        <span className="w-8 text-center text-sm font-medium text-white">{item.quantity}</span>
+                        <QtyInput
+                          value={item.quantity}
+                          max={available}
+                          onCommit={(qty) => updateQty(item.productId, qty)}
+                        />
                         <button
                           onClick={() => updateQty(item.productId, item.quantity + 1)}
                           disabled={item.quantity >= available}

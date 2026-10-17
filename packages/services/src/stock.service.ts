@@ -211,10 +211,16 @@ export interface ReverseSalesResult {
 }
 
 /**
- * Annule l'effet des ventes d'une référence : chaque quantité réellement sortie
- * (mouvements SALE négatifs) est remise en stock et journalisée en RETURN.
- * Aucun mouvement n'est créé si la référence n'a jamais enregistré de sortie
- * de stock (facture annulée avant validation, commande en attente, etc.).
+ * Annule l'effet des ventes d'une référence : réintègre en stock le solde NET
+ * encore sorti pour cette référence (somme signée des mouvements : SALE
+ * négatifs moins les RETURN déjà passés). Un mouvement RETURN est journalisé
+ * pour tracer la réintégration.
+ *
+ * Baser l'annulation sur le solde net (et non sur le total des SALE) rend
+ * l'opération idempotente : après une réactivation de vente, la sortie rejouée
+ * est correctement prise en compte, sans jamais réintégrer deux fois.
+ * Aucun mouvement n'est créé si la référence n'a aucune sortie nette active
+ * (facture annulée avant validation, commande en attente, etc.).
  */
 export async function reverseSalesForReferenceCore(
   client: DbClient,
@@ -224,16 +230,18 @@ export async function reverseSalesForReferenceCore(
     by: ['productId', 'warehouseId'],
     where: {
       reference: input.reference,
-      type: StockMovementType.SALE,
-      quantity: { lt: 0 },
+      quantity: { not: 0 },
     },
     _sum: { quantity: true },
   })
 
   let quantity = 0
+  let lines = 0
   for (const m of movements) {
-    const qty = Math.abs(Number(m._sum.quantity ?? 0))
-    if (qty <= 0) continue
+    const net = Number(m._sum.quantity ?? 0)
+    // Solde positif = rien à réintégrer (déjà annulé) ; 0 = aucune sortie.
+    if (net >= 0) continue
+    const qty = Math.abs(net)
     const level = await getOrCreateStockLevel(client, m.productId, m.warehouseId)
     await client.stockLevel.update({
       where: { id: level.id },
@@ -251,9 +259,10 @@ export async function reverseSalesForReferenceCore(
       },
     })
     quantity += qty
+    lines += 1
   }
 
-  return { lines: movements.length, quantity }
+  return { lines, quantity }
 }
 
 export async function reverseSalesForReference(input: ReverseSalesInput): Promise<ReverseSalesResult> {

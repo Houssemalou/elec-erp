@@ -27,6 +27,7 @@ export default async function NewInvoicePage() {
           dateLabel="Date d&apos;émission"
           dateName="issueDate"
           extraDate={{ label: 'Échéance', name: 'dueDate', default: '' }}
+          targetPriceMode
         />
       </Card>
     </div>

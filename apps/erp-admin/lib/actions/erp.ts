@@ -40,6 +40,7 @@ import {
   runInventory,
   createPosSale,
   cancelPosSale,
+  restorePosSale,
   createExpense,
   updateExpense as updateExpenseService,
   deleteExpense as deleteExpenseService,
@@ -52,6 +53,8 @@ import {
   closeWeeklyClosing,
   reopenWeeklyClosing,
   deleteWeeklyClosing,
+  mondayOf,
+  getSalesGainBetween,
   type ReceivableInput,
   type WeeklyClosingInput,
 } from '@elec/services'
@@ -1375,8 +1378,9 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
   const purchasesTTC = num(fd, 'purchasesTTC')
   const expensesTTC = num(fd, 'expensesTTC')
   const otherExpensesTTC = num(fd, 'otherExpensesTTC')
+  const costOfGoodsTTC = num(fd, 'costOfGoodsTTC')
 
-  if (revenueTTC < 0 || purchasesTTC < 0 || expensesTTC < 0 || otherExpensesTTC < 0) {
+  if (revenueTTC < 0 || purchasesTTC < 0 || expensesTTC < 0 || otherExpensesTTC < 0 || costOfGoodsTTC < 0) {
     return { ok: false, error: 'Les montants ne peuvent pas être négatifs' }
   }
 
@@ -1388,8 +1392,35 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
       purchasesTTC,
       expensesTTC,
       otherExpensesTTC,
+      costOfGoodsTTC,
       notes: str(fd, 'notes') || null,
     },
+  }
+}
+
+export interface WeeklyAutoValues {
+  success: boolean
+  error?: string
+  revenueTTC?: number
+  costOfGoodsTTC?: number
+  missingCostLines?: number
+}
+
+/** Valeurs calculées automatiquement pour le lundi de la semaine voulue. */
+export async function getWeeklyAutoValuesAction(weekStart: string): Promise<WeeklyAutoValues> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+
+  const date = new Date(weekStart)
+  if (Number.isNaN(date.getTime())) return { success: false, error: 'Date invalide' }
+
+  const start = mondayOf(date)
+  const result = await getSalesGainBetween(start, new Date(start.getTime() + 7 * 86400000))
+  return {
+    success: true,
+    revenueTTC: result.revenueTTC,
+    costOfGoodsTTC: result.costOfGoodsTTC,
+    missingCostLines: result.missingCostLines,
   }
 }
 
@@ -1528,6 +1559,23 @@ export async function cancelPosSaleAction(id: string, reason?: string): Promise<
   if (!user) return { success: false, error: 'Accès non autorisé' }
   try {
     const result = await cancelPosSale(id, user.id, reason)
+    revalidateAfterSaleChange(`/ventes-caisse/${id}`)
+    return { success: true, id, invoiceId: result.sale.invoiceId ?? undefined }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Réactivation d'une vente en caisse annulée (« annuler l'annulation ») : le
+ * bon de livraison et la facture liée repassent validés et le stock des
+ * articles est à nouveau déduit. Réservée aux encadrants.
+ */
+export async function restorePosSaleAction(id: string): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  try {
+    const result = await restorePosSale(id, user.id)
     revalidateAfterSaleChange(`/ventes-caisse/${id}`)
     return { success: true, id, invoiceId: result.sale.invoiceId ?? undefined }
   } catch (e) {

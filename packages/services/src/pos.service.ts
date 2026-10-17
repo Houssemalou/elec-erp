@@ -341,6 +341,81 @@ export async function cancelPosSale(id: string, userId: string, reason?: string 
   })
 }
 
+/**
+ * RÉACTIVATION d'une vente en caisse annulée (« annuler l'annulation ») :
+ * inverse `cancelPosSale`. La vente repasse VALIDATED, la facture liée est
+ * rétablie (le statut est déduit du montant encaissé) et la sortie de stock
+ * est rejouée à partir des lignes du bon de livraison : les articles sont à
+ * nouveau déduits. Échoue si le stock disponible est insuffisant.
+ */
+export async function restorePosSale(id: string, userId: string) {
+  const warehouseId = await getDefaultWarehouseId()
+
+  return db.$transaction(async (tx) => {
+    const sale = await tx.deliveryNote.findUnique({
+      where: { id },
+      include: { invoice: true, items: true },
+    })
+    if (!sale) throw new Error('Vente en caisse introuvable')
+    if (sale.source !== DeliveryNoteSource.POS) {
+      throw new Error('Ce bon de livraison ne provient pas d\'une vente en caisse')
+    }
+    if (sale.status !== DeliveryNoteStatus.CANCELLED) {
+      throw new Error('Cette vente en caisse n\'est pas annulée')
+    }
+
+    // Même référence que la sortie d'origine : la facture si elle existe,
+    // sinon le bon de livraison.
+    const reference = sale.invoice ? sale.invoice.number : sale.number
+
+    let quantity = 0
+    for (const item of sale.items) {
+      if (!item.productId) continue
+      await decrementStockCore(tx, {
+        productId: item.productId,
+        warehouseId,
+        quantity: Number(item.quantity),
+        type: StockMovementType.SALE,
+        reference,
+        reason: `Réactivation vente caisse ${sale.number}`,
+        userId,
+      })
+      quantity += Number(item.quantity)
+    }
+
+    let invoiceStatus: InvoiceStatus | null = null
+    if (sale.invoice && sale.invoice.status === InvoiceStatus.CANCELLED) {
+      const total = Number(sale.invoice.totalTTC)
+      const paid = Number(sale.invoice.paidAmount)
+      const status =
+        total > 0 && paid >= total
+          ? InvoiceStatus.PAID
+          : paid > 0
+            ? InvoiceStatus.PARTIALLY_PAID
+            : InvoiceStatus.VALIDATED
+      const inv = await tx.invoice.update({ where: { id: sale.invoice.id }, data: { status } })
+      invoiceStatus = inv.status
+    }
+
+    // Retire la marque « — annulée … » apposée lors de l'annulation.
+    const cleanedNotes = (sale.notes ?? 'Vente en caisse').replace(/\s*—\s*annulée(?:\s*—.*)?$/s, '')
+
+    const updated = await tx.deliveryNote.update({
+      where: { id },
+      data: { status: DeliveryNoteStatus.VALIDATED, notes: cleanedNotes },
+    })
+
+    await createNotification({
+      type: 'SYSTEM',
+      title: 'Vente en caisse réactivée',
+      message: `Bon de livraison ${sale.number} réactivé${sale.invoice ? ` et facture ${sale.invoice.number} rétablie` : ''} — ${Number(sale.totalTTC).toFixed(3)} DT réintégrés au chiffre d'affaires, ${quantity.toFixed(3)} unité(s) déduites du stock.`,
+      link: `/ventes-caisse/${sale.id}`,
+    })
+
+    return { sale: updated, invoiceStatus, quantity }
+  })
+}
+
 /** Liste des ventes POS (factures avec source = POS). */
 export async function listPosSales(options?: { search?: string; limit?: number }) {
   const where: Prisma.InvoiceWhereInput = { source: InvoiceSource.POS }

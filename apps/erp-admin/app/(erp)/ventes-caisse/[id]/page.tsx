@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import { db } from '@elec/db'
 import { PageHeader, Card, Badge, Table, THead, TR, TH, TD } from '@/components/ui'
 import { CancelSaleButton } from '@/components/pos/cancel-sale-button'
-import { cancelPosSaleAction } from '@/lib/actions/erp'
+import { RestoreSaleButton } from '@/components/pos/restore-sale-button'
+import { cancelPosSaleAction, restorePosSaleAction } from '@/lib/actions/erp'
 import { money, formatDate } from '@/lib/utils'
 import { ArrowLeft } from 'lucide-react'
 
@@ -43,7 +44,9 @@ export default async function VenteCaisseDetailPage({
         description={`Bon de livraison du ${formatDate(sale.issueDate)}`}
         actions={
           <div className="flex items-center gap-2">
-            {isCancelled ? null : (
+            {isCancelled ? (
+              <RestoreSaleButton id={sale.id} action={restorePosSaleAction} hasInvoice={Boolean(sale.invoice)} />
+            ) : (
               <CancelSaleButton id={sale.id} action={cancelPosSaleAction} hasInvoice={Boolean(sale.invoice)} />
             )}
             <Link href="/ventes-caisse" className="inline-flex items-center gap-1.5 rounded-lg border border-[#2A2A2A] px-3 py-2 text-sm text-white/60 hover:bg-white/5">

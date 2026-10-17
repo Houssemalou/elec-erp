@@ -200,3 +200,76 @@ export async function getFinanceSummary(options?: {
 function round3(value: number): number {
   return Math.round(value * 1000) / 1000
 }
+
+export interface WeeklySalesGain {
+  /** Chiffre d'affaires TTC de la période (factures + ventes caisse sans facture). */
+  revenueTTC: number
+  /** Coût de revient TTC des articles vendus sur la période. */
+  costOfGoodsTTC: number
+  /** Gain TTC = chiffre d'affaires TTC − coût de revient TTC. Négatif = perte. */
+  gainTTC: number
+  /** Taux de marge sur le CA, en pourcentage. */
+  gainRate: number
+  /** Lignes vendues sans coût de revient renseigné (gain partiel si > 0). */
+  missingCostLines: number
+}
+
+/**
+ * Gain TTC d'une période (typiquement une semaine), calculé AUTOMATIQUEMENT à
+ * partir des ventes enregistrées : chiffre d'affaires TTC moins le coût de
+ * revient TTC des articles vendus. Les ventes sont datées de la validation
+ * (repli sur la date d'émission), comme le reste des tableaux de bord.
+ *
+ * Les articles sans coût de revient renseigné ne sont pas comptés : le champ
+ * `missingCostLines` permet de signaler que le gain est alors partiel.
+ */
+export async function getSalesGainBetween(from: Date, to: Date): Promise<WeeklySalesGain> {
+  const dateScope = {
+    OR: [
+      { validatedAt: { gte: from, lt: to } },
+      { validatedAt: null, issueDate: { gte: from, lt: to } },
+    ],
+  }
+
+  const [invoices, cashSales, invoiceLines, cashLines] = await Promise.all([
+    db.invoice.findMany({
+      where: { status: { in: [...REVENUE_STATUSES] }, ...dateScope },
+      select: { totalTTC: true },
+    }),
+    db.deliveryNote.findMany({
+      where: { ...CASH_SALES_WITHOUT_INVOICE, ...dateScope },
+      select: { totalTTC: true },
+    }),
+    db.invoiceItem.findMany({
+      where: { invoice: { status: { in: [...REVENUE_STATUSES] }, ...dateScope } },
+      select: { quantity: true, taxRate: { select: { rate: true } }, product: { select: { costPrice: true } } },
+    }),
+    db.deliveryNoteItem.findMany({
+      where: { deliveryNote: { ...CASH_SALES_WITHOUT_INVOICE, ...dateScope } },
+      select: { quantity: true, taxRate: { select: { rate: true } }, product: { select: { costPrice: true } } },
+    }),
+  ])
+
+  const revenueTTC = round3(
+    invoices.reduce((s, i) => s + Number(i.totalTTC), 0) +
+      cashSales.reduce((s, p) => s + Number(p.totalTTC), 0),
+  )
+
+  let costTTC = 0
+  let missingCostLines = 0
+  for (const line of [...invoiceLines, ...cashLines]) {
+    const costHT = line.product?.costPrice
+    if (costHT === null || costHT === undefined) {
+      missingCostLines += 1
+      continue
+    }
+    const factor = 1 + Number(line.taxRate.rate) / 100
+    costTTC += Number(costHT) * Number(line.quantity) * factor
+  }
+  costTTC = round3(costTTC)
+
+  const gainTTC = round3(revenueTTC - costTTC)
+  const gainRate = revenueTTC > 0 ? round3((gainTTC / revenueTTC) * 100) : 0
+
+  return { revenueTTC, costOfGoodsTTC: costTTC, gainTTC, gainRate, missingCostLines }
+}

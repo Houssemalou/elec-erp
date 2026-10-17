@@ -15,6 +15,8 @@ export interface DocLine {
   designation: string
   quantity: string
   unitPriceTTC: string
+  /** Prix de vente convenu avec le client : la remise est déduite automatiquement. */
+  targetPrice?: string
   discountType: '' | 'PERCENT' | 'AMOUNT'
   discountValue: string
   taxRate: number
@@ -64,6 +66,12 @@ interface DocumentFormProps {
   defaultNonAssujettiTva?: boolean
   /** Affiche le pied de page en TTC (facture d'achat) au lieu du HT (vente). */
   totalsInTTC?: boolean
+  /**
+   * Affiche une colonne « Prix de vente » : l'utilisateur saisit le prix
+   * convenu et la remise de la ligne se calcule automatiquement par rapport
+   * au P.U. TTC (prix catalogue).
+   */
+  targetPriceMode?: boolean
 }
 
 let lineSeq = 0
@@ -98,6 +106,7 @@ export function DocumentForm({
   showVatOption = false,
   defaultNonAssujettiTva = false,
   totalsInTTC = false,
+  targetPriceMode = false,
 }: DocumentFormProps) {
   const router = useRouter()
   const [lines, setLines] = useState<DocLine[]>(defaultLines)
@@ -110,16 +119,52 @@ export function DocumentForm({
   const addLine = () =>
     setLines((ls) => [
       ...ls,
-      { key: nextKey(), productId: '', sku: '', designation: '', quantity: '1', unitPriceTTC: '', discountType: '', discountValue: '', taxRate: 0 },
+      { key: nextKey(), productId: '', sku: '', designation: '', quantity: '1', unitPriceTTC: '', targetPrice: '', discountType: '', discountValue: '', taxRate: 0 },
     ])
 
   const updateLine = (key: string, patch: Partial<DocLine>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
 
+  /**
+   * Remise déduite du prix de vente convenu : montant (DT) = prix catalogue −
+   * prix de vente. Aucune remise si le prix de vente est vide ou supérieur au
+   * catalogue.
+   */
+  const discountFromTarget = (
+    catalogue: string,
+    target: string,
+  ): { discountType: DocLine['discountType']; discountValue: string } => {
+    const cat = Number(catalogue)
+    const tgt = Number(target)
+    if (!target.trim() || !Number.isFinite(tgt) || !Number.isFinite(cat) || cat <= 0) {
+      return { discountType: '', discountValue: '' }
+    }
+    const diff = roundMoney(cat - tgt)
+    return diff > 0 ? { discountType: 'AMOUNT', discountValue: String(diff) } : { discountType: '', discountValue: '' }
+  }
+
+  const updateTarget = (key: string, value: string) =>
+    setLines((ls) =>
+      ls.map((l) => (l.key === key ? { ...l, targetPrice: value, ...discountFromTarget(l.unitPriceTTC, value) } : l)),
+    )
+
+  const roundTargetPrice = (key: string, value: string) => {
+    const n = Number(value)
+    if (!value.trim() || !Number.isFinite(n)) return
+    updateTarget(key, String(roundMoney(n)))
+  }
+
   const roundLinePrice = (key: string, value: string) => {
     const n = Number(value)
     if (!value.trim() || !Number.isFinite(n)) return
-    updateLine(key, { unitPriceTTC: String(roundMoney(n)) })
+    const rounded = String(roundMoney(n))
+    setLines((ls) =>
+      ls.map((l) =>
+        l.key === key
+          ? { ...l, unitPriceTTC: rounded, ...(l.targetPrice?.trim() ? discountFromTarget(rounded, l.targetPrice) : {}) }
+          : l,
+      ),
+    )
   }
 
   const pickProduct = (key: string, productId: string) => {
@@ -136,6 +181,9 @@ export function DocumentForm({
       sku: p?.sku ?? '',
       designation: p?.name ?? '',
       unitPriceTTC: ttc === null ? '' : String(roundMoney(ttc)),
+      targetPrice: '',
+      discountType: '',
+      discountValue: '',
       taxRate: rate,
     })
   }
@@ -312,10 +360,11 @@ export function DocumentForm({
       <div className="mt-2 overflow-x-auto">
         <table className="w-full table-fixed text-sm">
           <colgroup>
-            <col className="w-[20%]" />
-            <col className="w-[22%]" />
+            <col className="w-[18%]" />
+            <col className={targetPriceMode ? 'w-[18%]' : 'w-[22%]'} />
             <col className="w-[62px]" />
             <col className="w-[88px]" />
+            {targetPriceMode ? <col className="w-[88px]" /> : null}
             <col className="w-[112px]" />
             <col className="w-[68px]" />
             <col className="w-[88px]" />
@@ -327,6 +376,7 @@ export function DocumentForm({
               <th className="px-2 py-2">Désignation</th>
               <th className="px-2 py-2 text-right">Qté</th>
               <th className="px-2 py-2 text-right">P.U. TTC</th>
+              {targetPriceMode ? <th className="px-2 py-2 text-right">Prix de vente</th> : null}
               <th className="px-2 py-2 text-right">Remise</th>
               <th className="px-2 py-2 text-right">TVA %</th>
               <th className="px-2 py-2 text-right">Total TTC</th>
@@ -374,12 +424,31 @@ export function DocumentForm({
                     min="0"
                     step="any"
                     value={l.unitPriceTTC}
-                    onChange={(e) => updateLine(l.key, { unitPriceTTC: e.target.value })}
+                    onChange={(e) =>
+                      updateLine(l.key, {
+                        unitPriceTTC: e.target.value,
+                        ...(l.targetPrice?.trim() ? discountFromTarget(e.target.value, l.targetPrice) : {}),
+                      })
+                    }
                     onBlur={() => roundLinePrice(l.key, l.unitPriceTTC)}
                     className="w-full text-right"
                     placeholder="0.000"
                   />
                 </td>
+                {targetPriceMode ? (
+                  <td className="px-2 py-1.5">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={l.targetPrice ?? ''}
+                      onChange={(e) => updateTarget(l.key, e.target.value)}
+                      onBlur={() => roundTargetPrice(l.key, l.targetPrice ?? '')}
+                      className="w-full text-right"
+                      placeholder="Prix convenu"
+                    />
+                  </td>
+                ) : null}
                 <td className="px-2 py-1.5">
                   <div className="flex items-center gap-1">
                     <select
@@ -429,7 +498,7 @@ export function DocumentForm({
             ))}
             {lines.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-2 py-8 text-center text-sm text-white/40">
+                <td colSpan={targetPriceMode ? 9 : 8} className="px-2 py-8 text-center text-sm text-white/40">
                   Aucune ligne — cliquez sur « Ajouter une ligne »
                 </td>
               </tr>

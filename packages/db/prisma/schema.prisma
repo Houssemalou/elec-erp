@@ -943,6 +943,7 @@ model WeeklyClosing {
   purchasesTTC      Decimal   @db.Decimal(12, 3) @default(0)
   expensesTTC       Decimal   @db.Decimal(12, 3) @default(0)
   otherExpensesTTC  Decimal   @db.Decimal(12, 3) @default(0)
+  costOfGoodsTTC    Decimal   @db.Decimal(12, 3) @default(0) // Coût de revient TTC des articles vendus
   notes             String?
   closedAt          DateTime? // Renseigné au verrouillage, vide tant que la semaine est ouverte
   createdById       String

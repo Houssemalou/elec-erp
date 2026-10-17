@@ -330,12 +330,25 @@ export interface WeeklyClosingInput {
   purchasesTTC: number
   expensesTTC: number
   otherExpensesTTC: number
+  /** Coût de revient TTC des articles vendus. Auto-rempli, ajustable. */
+  costOfGoodsTTC: number
   notes?: string | null
 }
 
 /** Gain TTC de la semaine. Négatif = perte. Jamais recalculé par la base. */
-export function weeklyGain(input: Omit<WeeklyClosingInput, 'weekStart'>): number {
+export function weeklyGain(
+  input: Pick<WeeklyClosingInput, 'revenueTTC' | 'purchasesTTC' | 'expensesTTC' | 'otherExpensesTTC'>,
+): number {
   return roundMoney(input.revenueTTC - input.purchasesTTC - input.expensesTTC - input.otherExpensesTTC)
+}
+
+/**
+ * Marge brute TTC de la semaine = chiffre d'affaires TTC − coût de revient TTC
+ * des articles vendus. Distincte du résultat net (`weeklyGain`) qui retient les
+ * achats, dépenses et autres dépenses.
+ */
+export function weeklyMargin(input: Pick<WeeklyClosingInput, 'revenueTTC' | 'costOfGoodsTTC'>): number {
+  return roundMoney(input.revenueTTC - input.costOfGoodsTTC)
 }
 
 export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: string) {
@@ -361,6 +374,7 @@ export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: 
         purchasesTTC: toDecimalString(input.purchasesTTC),
         expensesTTC: toDecimalString(input.expensesTTC),
         otherExpensesTTC: toDecimalString(input.otherExpensesTTC),
+        costOfGoodsTTC: toDecimalString(input.costOfGoodsTTC),
         notes: input.notes ?? null,
         createdById,
       },
@@ -369,6 +383,7 @@ export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: 
         purchasesTTC: toDecimalString(input.purchasesTTC),
         expensesTTC: toDecimalString(input.expensesTTC),
         otherExpensesTTC: toDecimalString(input.otherExpensesTTC),
+        costOfGoodsTTC: toDecimalString(input.costOfGoodsTTC),
         notes: input.notes ?? null,
       },
     })

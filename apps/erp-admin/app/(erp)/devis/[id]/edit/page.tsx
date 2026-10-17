@@ -55,6 +55,7 @@ export default async function EditQuotePage({ params }: { params: Promise<{ id: 
           dateLabel="Valide jusqu&apos;au"
           dateName="validUntil"
           defaultDate={quote.validUntil ? quote.validUntil.toISOString().slice(0, 10) : ''}
+          targetPriceMode
         />
       </Card>
     </div>
