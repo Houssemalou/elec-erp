@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { Eye, Search } from 'lucide-react'
 import { db } from '@elec/db'
-import { PageHeader, Card, Badge, Table, THead, TR, TH, TD, Input, Button } from '@/components/ui'
+import { mondayOf } from '@elec/services'
+import { PageHeader, Card, Badge, Table, THead, TR, TH, TD, Input } from '@/components/ui'
 import { Pagination, PAGE_SIZE, pageNumber } from '@/components/ui/pagination'
-import { money, formatDate } from '@/lib/utils'
+import { money, formatDate, dateInputValue, parseDateInput } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,13 +18,20 @@ function extractPayment(notes: string | null): { label: string; tone: 'green' | 
 export default async function VentesCaissePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string }>
+  searchParams: Promise<{ q?: string; page?: string; semaine?: string }>
 }) {
   const params = await searchParams
   const q = params.q
   const page = pageNumber(params.page)
 
+  // Filtre par semaine de lundi à lundi : `semaine` est un lundi (ou la date
+  // sélectionnée, ramenée au lundi qui la contient).
+  const monday = params.semaine ? mondayOf(parseDateInput(params.semaine)) : null
+  const weekEnd = monday ? new Date(monday.getTime() + 7 * 86400000) : null
+  const semaineParam = monday ? dateInputValue(monday) : undefined
+
   const where = { source: 'POS' as const }
+  if (monday && weekEnd) Object.assign(where, { issueDate: { gte: monday, lt: weekEnd } })
   if (q) {
     Object.assign(where, {
       OR: [
@@ -33,7 +41,7 @@ export default async function VentesCaissePage({
     })
   }
 
-  const [total, sales] = await Promise.all([
+  const [total, sales, weekAgg] = await Promise.all([
     db.deliveryNote.count({ where }),
     db.deliveryNote.findMany({
       where,
@@ -42,22 +50,61 @@ export default async function VentesCaissePage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
+    monday && weekEnd
+      ? db.deliveryNote.aggregate({
+          where: { source: 'POS', status: { not: 'CANCELLED' }, issueDate: { gte: monday, lt: weekEnd } },
+          _sum: { totalTTC: true },
+          _count: { _all: true },
+        })
+      : Promise.resolve(null),
   ])
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const thisMonday = mondayOf(new Date())
+  const prevMonday = new Date(thisMonday.getTime() - 7 * 86400000)
+  const qSuffix = q ? `&q=${encodeURIComponent(q)}` : ''
 
   return (
     <div>
       <PageHeader title="Ventes en caisse" description={`${total} vente${total > 1 ? 's' : ''}`} />
       <Card>
-        <form className="flex flex-wrap items-center gap-3 border-b border-[#2A2A2A] p-4">
-          <div className="relative max-w-md">
+        <form className="flex flex-wrap items-end gap-3 border-b border-[#2A2A2A] p-4">
+          <div className="relative max-w-md flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
             <Input name="q" defaultValue={q} placeholder="N° de bon, client…" className="pl-9" />
+          </div>
+          <div>
+            <label htmlFor="semaine" className="mb-1 block text-xs text-white/50">
+              Semaine (lundi)
+            </label>
+            <Input id="semaine" name="semaine" type="date" defaultValue={semaineParam} className="w-40" />
           </div>
           <button type="submit" className="rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 py-2 text-sm font-medium text-white/70 hover:bg-[#1A1A1A]">
             Filtrer
           </button>
+          <div className="flex items-center gap-3 text-xs text-white/50">
+            <Link href={`?semaine=${dateInputValue(thisMonday)}${qSuffix}`} className="hover:text-white">
+              Cette semaine
+            </Link>
+            <Link href={`?semaine=${dateInputValue(prevMonday)}${qSuffix}`} className="hover:text-white">
+              Semaine passée
+            </Link>
+            <Link href={q ? `?q=${encodeURIComponent(q)}` : '?'} className="hover:text-white">
+              Tout
+            </Link>
+          </div>
         </form>
+        {monday && weekEnd ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2A2A2A] bg-[#151515] px-4 py-3 text-sm">
+            <span className="text-white/60">
+              Semaine du {formatDate(monday)} au {formatDate(new Date(weekEnd.getTime() - 86400000))}
+            </span>
+            <span className="text-white/60">
+              {weekAgg?._count._all ?? 0} vente{(weekAgg?._count._all ?? 0) > 1 ? 's' : ''} • CA TTC{' '}
+              <span className="font-semibold text-white">{money(Number(weekAgg?._sum.totalTTC ?? 0))}</span>
+            </span>
+          </div>
+        ) : null}
         <Table>
           <THead>
             <TR>
@@ -124,7 +171,7 @@ export default async function VentesCaissePage({
             ) : null}
           </tbody>
         </Table>
-        <Pagination page={page} totalPages={totalPages} total={total} params={{ q }} />
+        <Pagination page={page} totalPages={totalPages} total={total} params={{ q, semaine: semaineParam }} />
       </Card>
     </div>
   )
