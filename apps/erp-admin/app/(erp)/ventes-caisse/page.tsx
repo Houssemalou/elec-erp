@@ -15,6 +15,27 @@ function extractPayment(notes: string | null): { label: string; tone: 'green' | 
   return { label: notes.slice(0, 30), tone: 'slate' }
 }
 
+/**
+ * Coût de revient TTC d'une vente : somme des coûts d'achat (HT en base) des
+ * articles, ramenés en TTC au taux de TVA de la ligne. `missing` compte les
+ * lignes sans prix de revient pour signaler un montant partiel.
+ */
+function saleCostOfGoodsTTC(
+  items: { quantity: unknown; product: { costPrice: unknown } | null; taxRate: { rate: unknown } }[],
+): { costTTC: number; missing: number } {
+  let costTTC = 0
+  let missing = 0
+  for (const item of items) {
+    const costHT = item.product?.costPrice
+    if (costHT === null || costHT === undefined) {
+      missing += 1
+      continue
+    }
+    costTTC += Number(costHT) * Number(item.quantity) * (1 + Number(item.taxRate.rate) / 100)
+  }
+  return { costTTC: Math.round(costTTC * 1000) / 1000, missing }
+}
+
 export default async function VentesCaissePage({
   searchParams,
 }: {
@@ -45,7 +66,17 @@ export default async function VentesCaissePage({
     db.deliveryNote.count({ where }),
     db.deliveryNote.findMany({
       where,
-      include: { customer: true, invoice: { select: { id: true, number: true } } },
+      include: {
+        customer: true,
+        invoice: { select: { id: true, number: true } },
+        items: {
+          select: {
+            quantity: true,
+            product: { select: { costPrice: true } },
+            taxRate: { select: { rate: true } },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -59,6 +90,7 @@ export default async function VentesCaissePage({
       : Promise.resolve(null),
   ])
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const anyMissingCost = sales.some((sale) => saleCostOfGoodsTTC(sale.items).missing > 0)
 
   const thisMonday = mondayOf(new Date())
   const prevMonday = new Date(thisMonday.getTime() - 7 * 86400000)
@@ -115,6 +147,8 @@ export default async function VentesCaissePage({
               <TH className="text-right">HT</TH>
               <TH className="text-right">TVA</TH>
               <TH className="text-right">TTC</TH>
+              <TH className="text-right">Prix de revient TTC</TH>
+              <TH className="text-right">Marge TTC</TH>
               <TH>Facture</TH>
               <TH>Statut</TH>
               <TH className="text-right">Actions</TH>
@@ -127,6 +161,8 @@ export default async function VentesCaissePage({
               const customerName = sale.customer
                 ? (sale.customer.companyName || [sale.customer.firstName, sale.customer.lastName].filter(Boolean).join(' ') || null)
                 : null
+              const { costTTC, missing } = saleCostOfGoodsTTC(sale.items)
+              const marginTTC = Math.round((Number(sale.totalTTC) - costTTC) * 1000) / 1000
               return (
                 <TR key={sale.id} className={cancelled ? 'opacity-50' : undefined}>
                   <TD className="font-mono text-xs font-medium text-white/70">{sale.number}</TD>
@@ -138,6 +174,12 @@ export default async function VentesCaissePage({
                   <TD className="text-right">{money(sale.totalHT)}</TD>
                   <TD className="text-right">{money(sale.totalTVA)}</TD>
                   <TD className="text-right font-semibold line-through decoration-white/30">{money(sale.totalTTC)}</TD>
+                  <TD className="text-right">
+                    {missing > 0 ? <span className="text-amber-400">{money(costTTC)} *</span> : money(costTTC)}
+                  </TD>
+                  <TD className={`text-right font-semibold ${marginTTC >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {money(marginTTC)}
+                  </TD>
                   <TD>
                     {sale.invoice ? (
                       <Link
@@ -166,11 +208,16 @@ export default async function VentesCaissePage({
             })}
             {sales.length === 0 ? (
               <TR>
-                <TD colSpan={10} className="py-12 text-center text-white/40">Aucune vente en caisse</TD>
+                <TD colSpan={12} className="py-12 text-center text-white/40">Aucune vente en caisse</TD>
               </TR>
             ) : null}
           </tbody>
         </Table>
+        {anyMissingCost ? (
+          <p className="border-t border-[#2A2A2A] px-4 py-2 text-xs text-amber-400">
+            * Prix de revient partiel : certains articles n&apos;ont pas de coût d&apos;achat renseigné.
+          </p>
+        ) : null}
         <Pagination page={page} totalPages={totalPages} total={total} params={{ q, semaine: semaineParam }} />
       </Card>
     </div>
