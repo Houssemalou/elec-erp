@@ -4,7 +4,9 @@ import { db } from '@elec/db'
 import { PageHeader, Card, Badge, Table, THead, TR, TH, TD } from '@/components/ui'
 import { CancelSaleButton } from '@/components/pos/cancel-sale-button'
 import { RestoreSaleButton } from '@/components/pos/restore-sale-button'
-import { cancelPosSaleAction, restorePosSaleAction } from '@/lib/actions/erp'
+import { EditSaleDiscount } from '@/components/pos/edit-sale-discount'
+import { cancelPosSaleAction, restorePosSaleAction, updatePosSaleDiscountAction } from '@/lib/actions/erp'
+import { EXPENSE_CATEGORY_LABELS } from '@/lib/labels'
 import { money, formatDate } from '@/lib/utils'
 import { ArrowLeft } from 'lucide-react'
 
@@ -24,6 +26,10 @@ export default async function VenteCaisseDetailPage({
       createdBy: { select: { name: true } },
       invoice: { select: { id: true, number: true, totalTTC: true, paidAmount: true, status: true } },
       items: { include: { taxRate: true } },
+      expenses: {
+        select: { id: true, number: true, label: true, category: true, amountTTC: true, expenseDate: true },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   })
 
@@ -36,6 +42,10 @@ export default async function VenteCaisseDetailPage({
   const payment = sale.notes?.includes('Carte') ? 'Carte' : sale.notes?.includes('Espèces') ? 'Espèces' : '—'
   const isCancelled = sale.status === 'CANCELLED'
   const invoiceCancelled = sale.invoice?.status === 'CANCELLED'
+
+  const grossTTC = Math.round(sale.items.reduce((s, i) => s + Number(i.lineTTC), 0) * 1000) / 1000
+  const discountTTC = grossTTC - Number(sale.totalTTC) > 0 ? Math.round((grossTTC - Number(sale.totalTTC)) * 1000) / 1000 : 0
+  const cashOutTotalTTC = sale.expenses.reduce((s, e) => s + Number(e.amountTTC), 0)
 
   return (
     <div>
@@ -92,6 +102,13 @@ export default async function VenteCaisseDetailPage({
           <div className="space-y-1.5 border-t border-[#2A2A2A] px-5 py-4 text-sm">
             <div className="flex justify-between text-white/60"><span>Sous-total HT</span><span>{money(sale.totalHT)}</span></div>
             <div className="flex justify-between text-white/60"><span>TVA</span><span>{money(sale.totalTVA)}</span></div>
+            <EditSaleDiscount
+              saleId={sale.id}
+              discountTTC={discountTTC}
+              grossTTC={grossTTC}
+              disabled={isCancelled}
+              action={updatePosSaleDiscountAction}
+            />
             <div className="flex justify-between border-t border-[#2A2A2A] pt-2 text-base font-bold text-white">
               <span>Total TTC</span>
               <span>{money(sale.totalTTC)}</span>
@@ -141,6 +158,32 @@ export default async function VenteCaisseDetailPage({
               </div>
             </Card>
           )}
+
+          {sale.expenses.length > 0 ? (
+            <Card>
+              <h3 className="border-b border-[#2A2A2A] px-5 py-3 text-sm font-semibold text-white">
+                Décaissements liés
+              </h3>
+              <div className="space-y-3 px-5 py-4 text-sm">
+                {sale.expenses.map((e) => (
+                  <div key={e.id} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-white">{e.label}</p>
+                      <p className="text-xs text-white/50">
+                        {EXPENSE_CATEGORY_LABELS[e.category]} • {formatDate(e.expenseDate)} • {e.number}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-semibold text-white/80">{money(e.amountTTC)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between border-t border-[#2A2A2A] pt-2 font-semibold text-white">
+                  <span>Total affecté</span>
+                  <span>{money(cashOutTotalTTC)}</span>
+                </div>
+                <p className="text-xs text-white/40">Ces décaissements sont suivis dans le module Dépenses.</p>
+              </div>
+            </Card>
+          ) : null}
         </div>
       </div>
     </div>

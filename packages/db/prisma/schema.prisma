@@ -727,6 +727,7 @@ model DeliveryNote {
   invoice   Invoice?            @relation(fields: [invoiceId], references: [id])
   createdBy User                @relation(fields: [createdById], references: [id])
   items     DeliveryNoteItem[]
+  expenses  Expense[]
 
   @@index([customerId])
   @@index([invoiceId])
@@ -921,6 +922,7 @@ enum ExpenseCategory {
   TRANSPORT
   FOURNITURES
   IMPOTS
+  DETTE
   AUTRE
 }
 
@@ -993,13 +995,16 @@ model Expense {
   expenseDate   DateTime        @default(now())
   paymentMethod PaymentMethod   @default(CASH)
   notes         String?
+  deliveryNoteId String?        // Décaissement rattaché à une vente en caisse
   createdById   String
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
-  createdBy User @relation("ExpenseCreator", fields: [createdById], references: [id])
+  createdBy    User          @relation("ExpenseCreator", fields: [createdById], references: [id])
+  deliveryNote DeliveryNote? @relation(fields: [deliveryNoteId], references: [id], onDelete: SetNull)
 
   @@index([expenseDate])
   @@index([category])
+  @@index([deliveryNoteId])
   @@map("expenses")
 }

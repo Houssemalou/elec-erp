@@ -41,6 +41,7 @@ import {
   createPosSale,
   cancelPosSale,
   restorePosSale,
+  updatePosSaleDiscount,
   createExpense,
   updateExpense as updateExpenseService,
   deleteExpense as deleteExpenseService,
@@ -1174,6 +1175,7 @@ const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'TRANSPORT',
   'FOURNITURES',
   'IMPOTS',
+  'DETTE',
   'AUTRE',
 ]
 
@@ -1523,6 +1525,26 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
   const discountType = str(fd, 'discountType') as 'PERCENT' | 'AMOUNT' | ''
   const discountValue = parseFloat(str(fd, 'discountValue') || '0')
 
+  // Décaissements affectés à la vente : où va l'argent encaissé.
+  let cashOutflows: Array<{ label: string; amountTTC: number; category: ExpenseCategory }> = []
+  const rawOutflows = str(fd, 'cashOutflows')
+  if (rawOutflows) {
+    try {
+      const parsed = JSON.parse(rawOutflows)
+      if (Array.isArray(parsed)) {
+        cashOutflows = parsed
+          .map((o) => ({
+            label: String(o?.label ?? '').trim(),
+            amountTTC: Number(o?.amountTTC ?? 0),
+            category: (EXPENSE_CATEGORIES.includes(o?.category) ? o.category : 'AUTRE') as ExpenseCategory,
+          }))
+          .filter((o) => o.amountTTC > 0)
+      }
+    } catch {
+      return { success: false, error: 'Décaissements invalides' }
+    }
+  }
+
   try {
     const sale = await createPosSale({
       customerId,
@@ -1534,6 +1556,7 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
       globalDiscountType: discountType || null,
       globalDiscountValue: discountValue || null,
       notes: str(fd, 'notes') || null,
+      cashOutflows,
     })
     revalidateAfterSaleChange()
     return {
@@ -1544,6 +1567,27 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
       invoiceId: sale.invoiceId,
       invoiceNumber: sale.invoiceNumber,
     }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Modification de la remise globale (en DT) d'une vente en caisse : le bon de
+ * livraison est recalculé (HT/TVA/TTC) pour que le chiffre d'affaires, la marge
+ * et le gain des ventes en caisse soient justes. La facture liée reste
+ * inchangée (première version). Réservée aux encadrants.
+ */
+export async function updatePosSaleDiscountAction(id: string, discountTTC: number): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!Number.isFinite(discountTTC) || discountTTC < 0) {
+    return { success: false, error: 'Remise invalide' }
+  }
+  try {
+    await updatePosSaleDiscount(id, { discountTTC }, user.id)
+    revalidateAfterSaleChange(`/ventes-caisse/${id}`)
+    return { success: true, id }
   } catch (e) {
     return { success: false, error: (e as Error).message }
   }

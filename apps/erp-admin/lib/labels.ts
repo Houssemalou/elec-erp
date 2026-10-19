@@ -8,6 +8,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   TRANSPORT: 'Transport',
   FOURNITURES: 'Fournitures',
   IMPOTS: 'Impôts',
+  DETTE: 'Dette',
   AUTRE: 'Autre',
 }
 

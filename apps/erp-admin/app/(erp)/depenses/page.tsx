@@ -18,6 +18,7 @@ const categoryTones: Record<ExpenseCategory, 'blue' | 'green' | 'amber' | 'red' 
   TRANSPORT: 'accent',
   FOURNITURES: 'slate',
   IMPOTS: 'red',
+  DETTE: 'amber',
   AUTRE: 'slate',
 }
 

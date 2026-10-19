@@ -4,6 +4,8 @@ import { db } from '@elec/db'
 import { mondayOf } from '@elec/services'
 import { PageHeader, Card, Badge, Table, THead, TR, TH, TD, Input } from '@/components/ui'
 import { Pagination, PAGE_SIZE, pageNumber } from '@/components/ui/pagination'
+import { EditSaleDiscount } from '@/components/pos/edit-sale-discount'
+import { updatePosSaleDiscountAction } from '@/lib/actions/erp'
 import { money, formatDate, dateInputValue, parseDateInput } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +38,16 @@ function saleCostOfGoodsTTC(
   return { costTTC: Math.round(costTTC * 1000) / 1000, missing }
 }
 
+/**
+ * Remise TTC consentie sur une vente = somme des lignes brutes − total TTC payé
+ * (la remise POS s'applique sur le TTC affiché). Bornée à 0.
+ */
+function saleDiscountTTC(items: { lineTTC: unknown }[], totalTTC: unknown): number {
+  const grossTTC = items.reduce((s, i) => s + Number(i.lineTTC), 0)
+  const discount = grossTTC - Number(totalTTC)
+  return discount > 0 ? Math.round(discount * 1000) / 1000 : 0
+}
+
 export default async function VentesCaissePage({
   searchParams,
 }: {
@@ -62,7 +74,7 @@ export default async function VentesCaissePage({
     })
   }
 
-  const [total, sales, weekAgg] = await Promise.all([
+  const [total, sales, weekAgg, weekItems] = await Promise.all([
     db.deliveryNote.count({ where }),
     db.deliveryNote.findMany({
       where,
@@ -72,6 +84,7 @@ export default async function VentesCaissePage({
         items: {
           select: {
             quantity: true,
+            lineTTC: true,
             product: { select: { costPrice: true } },
             taxRate: { select: { rate: true } },
           },
@@ -88,9 +101,20 @@ export default async function VentesCaissePage({
           _count: { _all: true },
         })
       : Promise.resolve(null),
+    monday && weekEnd
+      ? db.deliveryNoteItem.findMany({
+          where: { deliveryNote: { source: 'POS', status: { not: 'CANCELLED' }, issueDate: { gte: monday, lt: weekEnd } } },
+          select: { quantity: true, product: { select: { costPrice: true } }, taxRate: { select: { rate: true } } },
+        })
+      : Promise.resolve([]),
   ])
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const anyMissingCost = sales.some((sale) => saleCostOfGoodsTTC(sale.items).missing > 0)
+
+  // GAIN de la semaine = CA TTC − prix de revient TTC des articles vendus.
+  const weekRevenue = Number(weekAgg?._sum.totalTTC ?? 0)
+  const weekCost = saleCostOfGoodsTTC(weekItems)
+  const weekGainTTC = Math.round((weekRevenue - weekCost.costTTC) * 1000) / 1000
 
   const thisMonday = mondayOf(new Date())
   const prevMonday = new Date(thisMonday.getTime() - 7 * 86400000)
@@ -133,7 +157,14 @@ export default async function VentesCaissePage({
             </span>
             <span className="text-white/60">
               {weekAgg?._count._all ?? 0} vente{(weekAgg?._count._all ?? 0) > 1 ? 's' : ''} • CA TTC{' '}
-              <span className="font-semibold text-white">{money(Number(weekAgg?._sum.totalTTC ?? 0))}</span>
+              <span className="font-semibold text-white">{money(weekRevenue)}</span>
+            </span>
+            <span className="text-white/60">
+              Gain TTC{' '}
+              <span className={`font-semibold ${weekGainTTC >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {money(weekGainTTC)}
+                {weekCost.missing > 0 ? <span className="text-amber-400"> *</span> : null}
+              </span>
             </span>
           </div>
         ) : null}
@@ -146,6 +177,7 @@ export default async function VentesCaissePage({
               <TH>Paiement</TH>
               <TH className="text-right">HT</TH>
               <TH className="text-right">TVA</TH>
+              <TH className="text-right">Remise TTC</TH>
               <TH className="text-right">TTC</TH>
               <TH className="text-right">Prix de revient TTC</TH>
               <TH className="text-right">Marge TTC</TH>
@@ -163,6 +195,8 @@ export default async function VentesCaissePage({
                 : null
               const { costTTC, missing } = saleCostOfGoodsTTC(sale.items)
               const marginTTC = Math.round((Number(sale.totalTTC) - costTTC) * 1000) / 1000
+              const discountTTC = saleDiscountTTC(sale.items, sale.totalTTC)
+              const grossTTC = Math.round(sale.items.reduce((s, i) => s + Number(i.lineTTC), 0) * 1000) / 1000
               return (
                 <TR key={sale.id} className={cancelled ? 'opacity-50' : undefined}>
                   <TD className="font-mono text-xs font-medium text-white/70">{sale.number}</TD>
@@ -173,7 +207,17 @@ export default async function VentesCaissePage({
                   </TD>
                   <TD className="text-right">{money(sale.totalHT)}</TD>
                   <TD className="text-right">{money(sale.totalTVA)}</TD>
-                  <TD className="text-right font-semibold line-through decoration-white/30">{money(sale.totalTTC)}</TD>
+                  <TD className="text-right">
+                    <EditSaleDiscount
+                      saleId={sale.id}
+                      discountTTC={discountTTC}
+                      grossTTC={grossTTC}
+                      disabled={cancelled}
+                      variant="inline"
+                      action={updatePosSaleDiscountAction}
+                    />
+                  </TD>
+                  <TD className="text-right font-semibold">{money(sale.totalTTC)}</TD>
                   <TD className="text-right">
                     {missing > 0 ? <span className="text-amber-400">{money(costTTC)} *</span> : money(costTTC)}
                   </TD>
@@ -208,7 +252,7 @@ export default async function VentesCaissePage({
             })}
             {sales.length === 0 ? (
               <TR>
-                <TD colSpan={12} className="py-12 text-center text-white/40">Aucune vente en caisse</TD>
+                <TD colSpan={13} className="py-12 text-center text-white/40">Aucune vente en caisse</TD>
               </TR>
             ) : null}
           </tbody>

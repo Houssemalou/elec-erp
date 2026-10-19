@@ -1,4 +1,4 @@
-import { db, InvoiceStatus, InvoiceSource, DeliveryNoteSource, DeliveryNoteStatus, Prisma } from '@elec/db'
+import { db, InvoiceStatus, InvoiceSource, DeliveryNoteSource, DeliveryNoteStatus, ExpenseCategory, PaymentMethod, Prisma } from '@elec/db'
 import { calculateDocumentTotals, toDecimalString, type DocumentLineInput } from '@elec/contracts'
 import { currentYear, nextSequenceNumber, serializeVatBreakdown, getDefaultWarehouseId } from './helpers'
 import { buildLineRows } from './quote.service'
@@ -44,6 +44,18 @@ export interface CreatePosSaleInput {
   globalDiscountType?: 'PERCENT' | 'AMOUNT' | null
   globalDiscountValue?: number | null
   notes?: string | null
+  /**
+   * Décaissements affectés à cette vente : le caissier indique où va l'argent
+   * encaissé (ex. payer une dette). Chaque affectation devient une dépense
+   * liée au bon de livraison, suivie par le module Dépenses.
+   */
+  cashOutflows?: PosCashOutflow[] | null
+}
+
+export interface PosCashOutflow {
+  label?: string | null
+  amountTTC: number
+  category?: ExpenseCategory | null
 }
 
 export interface PosSaleResult {
@@ -150,6 +162,26 @@ export async function createPosSale(input: CreatePosSaleInput): Promise<PosSaleR
 
     let invoiceId: string | undefined
     let invoiceNumber: string | undefined
+
+    // 5b. Décaissements rattachés à la vente : chaque affectation devient une
+    // dépense liée au bon de livraison (d'où va l'argent encaissé).
+    const outflows = (input.cashOutflows ?? []).filter((o) => Number(o.amountTTC) > 0)
+    for (const outflow of outflows) {
+      const depNumber = await nextSequenceNumber('DEP', currentYear(), tx)
+      await tx.expense.create({
+        data: {
+          number: depNumber,
+          label: outflow.label?.trim() || 'Décaissement vente',
+          category: outflow.category ?? ExpenseCategory.AUTRE,
+          amountTTC: toDecimalString(outflow.amountTTC),
+          expenseDate: new Date(),
+          paymentMethod: PaymentMethod.CASH,
+          notes: `Affecté à la vente ${blNumber}`,
+          deliveryNoteId: deliveryNote.id,
+          createdById: input.createdById,
+        },
+      })
+    }
 
     // 6. Création de la facture (SI demandée)
     // Même préfixe que les factures classiques : une seule série continue,
@@ -413,6 +445,72 @@ export async function restorePosSale(id: string, userId: string) {
     })
 
     return { sale: updated, invoiceStatus, quantity }
+  })
+}
+
+/**
+ * Modifie la REMISE GLOBALE d'une vente en caisse (en DT sur le TTC affiché) et
+ * recalcule les totaux HT/TVA/TTC du bon de livraison à partir de ses lignes.
+ * Sert à corriger la remise saisie au POS afin que le chiffre d'affaires, la
+ * marge et le gain issus des ventes en caisse soient justes.
+ *
+ * La facture liée n'est PAS touchée : les prix et la remise facturés restent
+ * ceux de la première version. La modification est refusée sur une vente annulée.
+ */
+export interface UpdatePosSaleDiscountInput {
+  /** Remise globale en DT appliquée au TTC affiché (0 = aucune remise). */
+  discountTTC: number
+}
+
+export async function updatePosSaleDiscount(
+  id: string,
+  input: UpdatePosSaleDiscountInput,
+  _userId: string,
+): Promise<{ discountTTC: number; totalTTC: number }> {
+  return db.$transaction(async (tx) => {
+    const sale = await tx.deliveryNote.findUnique({
+      where: { id },
+      include: { items: { include: { taxRate: true } } },
+    })
+    if (!sale) throw new Error('Vente en caisse introuvable')
+    if (sale.source !== DeliveryNoteSource.POS) {
+      throw new Error('Ce bon de livraison ne provient pas d\'une vente en caisse')
+    }
+    if (sale.status === DeliveryNoteStatus.CANCELLED) {
+      throw new Error('Impossible de modifier la remise d\'une vente annulée')
+    }
+
+    // Les lignes du BL portent le prix unitaire TTC brut (sans remise) : la
+    // remise globale est reconstruite à partir de ces lignes, comme au POS.
+    const lines: DocumentLineInput[] = sale.items.map((item) => ({
+      productId: item.productId ?? undefined,
+      sku: item.sku,
+      designation: item.designation,
+      quantity: Number(item.quantity),
+      unitPriceTTC: Number(item.unitPriceTTC),
+      discountValue: 0,
+      discountType: null,
+      taxRate: Number(item.taxRate.rate),
+    }))
+
+    const discountTTC = Math.max(0, Math.round(input.discountTTC * 1000) / 1000)
+    const totals = calculateDocumentTotals({
+      lines,
+      globalDiscount: discountTTC > 0 ? { type: 'AMOUNT', value: discountTTC } : null,
+      discountBasis: 'TTC',
+      timbreFiscal: 0,
+    })
+
+    const updated = await tx.deliveryNote.update({
+      where: { id },
+      data: {
+        totalHT: toDecimalString(totals.totalHT),
+        totalTVA: toDecimalString(totals.totalTVA),
+        totalTTC: toDecimalString(totals.totalTTC),
+      },
+    })
+
+    return { discountTTC, totalTTC: Number(updated.totalTTC) }
   })
 }
 

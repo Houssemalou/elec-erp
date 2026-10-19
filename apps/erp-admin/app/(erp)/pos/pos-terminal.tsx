@@ -152,6 +152,24 @@ type SuccessResult = {
   }
 }
 
+type CashOutflow = {
+  label: string
+  amount: string
+  category: string
+}
+
+/** Catégories de décaissement proposées au caissier (miroir d'ExpenseCategory). */
+const OUTFLOW_CATEGORIES: { value: string; label: string }[] = [
+  { value: 'DETTE', label: 'Payer une dette' },
+  { value: 'FOURNITURES', label: 'Fournitures' },
+  { value: 'TRANSPORT', label: 'Transport' },
+  { value: 'SALAIRES', label: 'Salaires' },
+  { value: 'LOYER', label: 'Loyer' },
+  { value: 'ELECTRICITE', label: 'Électricité' },
+  { value: 'IMPOTS', label: 'Impôts' },
+  { value: 'AUTRE', label: 'Autre' },
+]
+
 export default function PosTerminal({
   products,
   customers,
@@ -179,6 +197,17 @@ export default function PosTerminal({
   const [manualMatricule, setManualMatricule] = useState('')
   const [discountType, setDiscountType] = useState<'NONE' | 'PERCENT' | 'AMOUNT'>('NONE')
   const [discountValue, setDiscountValue] = useState('')
+  const [outflows, setOutflows] = useState<CashOutflow[]>([])
+
+  const addOutflow = useCallback(() => {
+    setOutflows((prev) => [...prev, { label: '', amount: '', category: 'DETTE' }])
+  }, [])
+  const updateOutflow = useCallback((index: number, patch: Partial<CashOutflow>) => {
+    setOutflows((prev) => prev.map((o, i) => (i === index ? { ...o, ...patch } : o)))
+  }, [])
+  const removeOutflow = useCallback((index: number) => {
+    setOutflows((prev) => prev.filter((_, i) => i !== index))
+  }, [])
 
   const categories = useMemo(() => {
   const counts = new Map<string, number>()
@@ -291,6 +320,8 @@ export default function PosTerminal({
   const totalTVA = totals.totalTVA
   const totalTTC = totals.totalTTC
 
+  const outflowTotal = outflows.reduce((s, o) => s + (Number(o.amount) || 0), 0)
+
   // Coût d'achat TTC et gain : servent à vérifier la marge au moment de la vente.
   // Un article sans prix de revient sur sa fiche rend le total incomplet, on ne
   // l'annonce donc pas plutôt que d'afficher un gain faux.
@@ -334,6 +365,14 @@ export default function PosTerminal({
     fd.set('lines', JSON.stringify(cart.map((i) => ({ productId: i.productId, quantity: i.quantity }))))
     fd.set('discountType', discountType === 'NONE' ? '' : discountType)
     fd.set('discountValue', discountValue || '0')
+    fd.set(
+      'cashOutflows',
+      JSON.stringify(
+        outflows
+          .map((o) => ({ label: o.label.trim(), amountTTC: Number(o.amount) || 0, category: o.category }))
+          .filter((o) => o.amountTTC > 0),
+      ),
+    )
 
     // Manual client info for invoice
     if (generateInvoice && !customerId) {
@@ -388,6 +427,7 @@ export default function PosTerminal({
         setManualMatricule('')
         setDiscountType('NONE')
         setDiscountValue('')
+        setOutflows([])
         setSearch('')
       } else {
         setError(res.error ?? 'Erreur lors de la vente')
@@ -794,6 +834,75 @@ export default function PosTerminal({
               Remise TTC : -{money(discountAmount)}
             </div>
           )}
+
+          {/* Décaissements — où va l'argent encaissé (ex. payer une dette) */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-white/60">Où va l&apos;argent ? (optionnel)</span>
+              <button
+                type="button"
+                onClick={addOutflow}
+                className="flex items-center gap-1 text-xs font-medium text-accent-400 hover:text-accent-300"
+              >
+                <Plus className="h-3 w-3" /> Ajouter
+              </button>
+            </div>
+            {outflows.length === 0 ? (
+              <p className="mt-1 text-[11px] text-white/30">
+                Rattachez un décaissement à cette vente (ex. payer une dette fournisseur).
+              </p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {outflows.map((o, idx) => (
+                  <div key={idx} className="space-y-1.5 rounded-lg border border-[#2A2A2A] bg-[#151515] p-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={o.category}
+                        onChange={(e) => updateOutflow(idx, { category: e.target.value })}
+                        className="h-9 flex-1 rounded-lg border border-[#2A2A2A] bg-[#0B0B0B] px-2 text-xs text-white focus:border-accent-400 focus:outline-none"
+                      >
+                        {OUTFLOW_CATEGORIES.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={o.amount}
+                        onChange={(e) => updateOutflow(idx, { amount: e.target.value })}
+                        placeholder="Montant DT"
+                        className="h-9 w-24 rounded-lg border border-[#2A2A2A] bg-[#0B0B0B] px-2 text-xs text-white placeholder-white/30 focus:border-accent-400 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeOutflow(idx)}
+                        className="text-white/30 hover:text-red-400"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={o.label}
+                      onChange={(e) => updateOutflow(idx, { label: e.target.value })}
+                      placeholder="Libellé (ex. Fournisseur X)"
+                      className="h-9 w-full rounded-lg border border-[#2A2A2A] bg-[#0B0B0B] px-2 text-xs text-white placeholder-white/30 focus:border-accent-400 focus:outline-none"
+                    />
+                  </div>
+                ))}
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-white/50">Total affecté</span>
+                  <span className={outflowTotal > totalTTC ? 'font-semibold text-red-400' : 'font-semibold text-white/70'}>
+                    {money(outflowTotal)}
+                    {outflowTotal > totalTTC ? ' (> encaissé)' : ''}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Document options */}
           <div className="mt-4 space-y-2">
