@@ -54,7 +54,7 @@ import {
   closeWeeklyClosing,
   reopenWeeklyClosing,
   deleteWeeklyClosing,
-  mondayOf,
+  weekStartOf,
   getSalesGainBetween,
   type ReceivableInput,
   type WeeklyClosingInput,
@@ -1381,8 +1381,16 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
   const expensesTTC = num(fd, 'expensesTTC')
   const otherExpensesTTC = num(fd, 'otherExpensesTTC')
   const costOfGoodsTTC = num(fd, 'costOfGoodsTTC')
+  const cashOnHandTTC = num(fd, 'cashOnHandTTC')
 
-  if (revenueTTC < 0 || purchasesTTC < 0 || expensesTTC < 0 || otherExpensesTTC < 0 || costOfGoodsTTC < 0) {
+  if (
+    revenueTTC < 0 ||
+    purchasesTTC < 0 ||
+    expensesTTC < 0 ||
+    otherExpensesTTC < 0 ||
+    costOfGoodsTTC < 0 ||
+    cashOnHandTTC < 0
+  ) {
     return { ok: false, error: 'Les montants ne peuvent pas être négatifs' }
   }
 
@@ -1395,6 +1403,7 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
       expensesTTC,
       otherExpensesTTC,
       costOfGoodsTTC,
+      cashOnHandTTC,
       notes: str(fd, 'notes') || null,
     },
   }
@@ -1416,7 +1425,7 @@ export async function getWeeklyAutoValuesAction(weekStart: string): Promise<Week
   const date = new Date(weekStart)
   if (Number.isNaN(date.getTime())) return { success: false, error: 'Date invalide' }
 
-  const start = mondayOf(date)
+  const start = weekStartOf(date)
   const result = await getSalesGainBetween(start, new Date(start.getTime() + 7 * 86400000))
   return {
     success: true,

@@ -15,6 +15,7 @@ export interface WeeklyClosingFormData {
   expensesTTC: string
   otherExpensesTTC: string
   costOfGoodsTTC: string
+  cashOnHandTTC: string
   notes: string
 }
 
@@ -67,6 +68,7 @@ export function WeeklyClosingForm({
   const [expenses, setExpenses] = useState(closing?.expensesTTC ?? '')
   const [other, setOther] = useState(closing?.otherExpensesTTC ?? '')
   const [costOfGoods, setCostOfGoods] = useState(closing?.costOfGoodsTTC ?? String(auto.costOfGoodsTTC))
+  const [cashOnHand, setCashOnHand] = useState(closing?.cashOnHandTTC ?? '')
 
   const num = (v: string) => {
     const n = parseFloat(v)
@@ -251,6 +253,25 @@ export function WeeklyClosingForm({
               <RefreshCw className="h-4 w-4" />
               Recalculer CA et prix de revient
             </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="cashOnHandTTC">Montant en caisse à la fin de la semaine (TTC)</Label>
+            <Input
+              id="cashOnHandTTC"
+              name="cashOnHandTTC"
+              type="number"
+              step="0.001"
+              min="0"
+              value={cashOnHand}
+              onChange={(e) => setCashOnHand(e.target.value)}
+              placeholder="0,000"
+            />
+            <p className="mt-1 text-xs text-white/40">
+              Espèces physiquement présentes en caisse au dernier jour de la semaine.
+            </p>
           </div>
         </div>
 

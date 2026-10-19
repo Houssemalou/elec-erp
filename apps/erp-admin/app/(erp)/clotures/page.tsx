@@ -9,7 +9,7 @@ import {
   saveWeeklyClosingAction,
   getWeeklyAutoValuesAction,
 } from '@/lib/actions/erp'
-import { getWeeklyClosingByWeek, listWeeklyClosings, weeklyGain, weeklyMargin, mondayOf, getSalesGainBetween } from '@elec/services'
+import { getWeeklyClosingByWeek, listWeeklyClosings, weeklyGain, weeklyMargin, weekStartOf, getSalesGainBetween } from '@elec/services'
 import { money, formatDate, dateInputValue, parseDateInput } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -23,10 +23,10 @@ export default async function CloturesPage({
 
   // La semaine demandée, ou la semaine dernière (celle qui est close quand on
   // travaille en début de semaine).
-  const latestMonday = mondayOf(new Date(Date.now() - 7 * 86400000))
+  const latestMonday = weekStartOf(new Date(Date.now() - 7 * 86400000))
   const reference = params.semaine ? parseDateInput(params.semaine) : latestMonday
   const [current, history] = await Promise.all([getWeeklyClosingByWeek(reference), listWeeklyClosings()])
-  const weekStart = current?.weekStart ?? mondayOf(reference)
+  const weekStart = current?.weekStart ?? weekStartOf(reference)
   const weekEnd = new Date(weekStart.getTime() + 6 * 86400000)
   // Le gain TTC est calculé automatiquement sur la semaine (lundi → lundi exclu).
   const autoGain = await getSalesGainBetween(weekStart, new Date(weekStart.getTime() + 7 * 86400000))
@@ -118,6 +118,7 @@ export default async function CloturesPage({
                       ['Achats TTC', Number(current.purchasesTTC)],
                       ['Dépenses TTC', Number(current.expensesTTC)],
                       ['Autres dépenses TTC', Number(current.otherExpensesTTC)],
+                      ['Espèces en caisse TTC', Number(current.cashOnHandTTC)],
                     ].map(([label, value]) => (
                       <div key={String(label)} className="flex justify-between border-b border-[#2A2A2A] pb-2">
                         <dt className="text-white/50">{label}</dt>
@@ -158,6 +159,7 @@ export default async function CloturesPage({
                           expensesTTC: String(current.expensesTTC),
                           otherExpensesTTC: String(current.otherExpensesTTC),
                           costOfGoodsTTC: String(current.costOfGoodsTTC),
+                          cashOnHandTTC: String(current.cashOnHandTTC),
                           notes: current.notes ?? '',
                         }
                       : null

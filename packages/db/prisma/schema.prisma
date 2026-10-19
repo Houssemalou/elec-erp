@@ -939,13 +939,14 @@ enum ReceivableStatus {
 model WeeklyClosing {
   id                String    @id @default(cuid())
   number            String    @unique // SEM-YYYY-NN
-  weekStart         DateTime  @unique // Lundi 00:00, début de la semaine
-  weekEnd           DateTime // Lundi suivant 00:00 (exclusive)
+  weekStart         DateTime  @unique // Mardi 00:00, début de la semaine
+  weekEnd           DateTime // Mardi suivant 00:00 (exclusive)
   revenueTTC        Decimal   @db.Decimal(12, 3) @default(0)
   purchasesTTC      Decimal   @db.Decimal(12, 3) @default(0)
   expensesTTC       Decimal   @db.Decimal(12, 3) @default(0)
   otherExpensesTTC  Decimal   @db.Decimal(12, 3) @default(0)
   costOfGoodsTTC    Decimal   @db.Decimal(12, 3) @default(0) // Coût de revient TTC des articles vendus
+  cashOnHandTTC     Decimal   @db.Decimal(12, 3) @default(0) // Espèces en caisse à la clôture
   notes             String?
   closedAt          DateTime? // Renseigné au verrouillage, vide tant que la semaine est ouverte
   createdById       String

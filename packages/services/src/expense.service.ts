@@ -131,3 +131,11 @@ export async function getExpenseSummary(options?: { from?: Date; to?: Date }) {
     .sort((a, b) => b.amountTTC - a.amountTTC)
   return { totalTTC: Number(total._sum.amountTTC ?? 0), categories }
 }
+
+export async function getExpensesTotalBetween(from: Date, to: Date): Promise<number> {
+  const agg = await db.expense.aggregate({
+    where: { expenseDate: { gte: from, lt: to } },
+    _sum: { amountTTC: true },
+  })
+  return Math.round(Number(agg._sum.amountTTC ?? 0) * 1000) / 1000
+}

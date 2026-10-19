@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Eye, Search } from 'lucide-react'
 import { db } from '@elec/db'
-import { mondayOf } from '@elec/services'
+import { weekStartOf } from '@elec/services'
 import { PageHeader, Card, Badge, Table, THead, TR, TH, TD, Input } from '@/components/ui'
 import { Pagination, PAGE_SIZE, pageNumber } from '@/components/ui/pagination'
 import { EditSaleDiscount } from '@/components/pos/edit-sale-discount'
@@ -57,9 +57,7 @@ export default async function VentesCaissePage({
   const q = params.q
   const page = pageNumber(params.page)
 
-  // Filtre par semaine de lundi à lundi : `semaine` est un lundi (ou la date
-  // sélectionnée, ramenée au lundi qui la contient).
-  const monday = params.semaine ? mondayOf(parseDateInput(params.semaine)) : null
+  const monday = params.semaine ? weekStartOf(parseDateInput(params.semaine)) : null
   const weekEnd = monday ? new Date(monday.getTime() + 7 * 86400000) : null
   const semaineParam = monday ? dateInputValue(monday) : undefined
 
@@ -116,7 +114,7 @@ export default async function VentesCaissePage({
   const weekCost = saleCostOfGoodsTTC(weekItems)
   const weekGainTTC = Math.round((weekRevenue - weekCost.costTTC) * 1000) / 1000
 
-  const thisMonday = mondayOf(new Date())
+  const thisMonday = weekStartOf(new Date())
   const prevMonday = new Date(thisMonday.getTime() - 7 * 86400000)
   const qSuffix = q ? `&q=${encodeURIComponent(q)}` : ''
 
@@ -131,7 +129,7 @@ export default async function VentesCaissePage({
           </div>
           <div>
             <label htmlFor="semaine" className="mb-1 block text-xs text-white/50">
-              Semaine (lundi)
+              Semaine (mardi)
             </label>
             <Input id="semaine" name="semaine" type="date" defaultValue={semaineParam} className="w-40" />
           </div>

@@ -305,14 +305,19 @@ export async function getReceivablesOverview(): Promise<ReceivablesOverview> {
 // Clôtures hebdomadaires — saisie manuelle, lundi → lundi, puis verrouillage
 // ============================================================================
 
-/** Lundi 00:00 de la semaine contenant `date`. La semaine ISO démarre le lundi. */
-export function mondayOf(date: Date): Date {
+/** Mardi 00:00 de la semaine contenant `date`. La semaine démarre le mardi et se termine le lundi suivant (inclus). */
+export function weekStartOf(date: Date): Date {
   const d = new Date(date)
   d.setHours(0, 0, 0, 0)
-  // getDay() : 0 = dimanche … 6 = samedi. On ramène au lundi.
-  const offset = (d.getDay() + 6) % 7
+  // getDay() : 0 = dimanche … 6 = samedi. Mardi = 2.
+  const offset = (d.getDay() + 5) % 7
   d.setDate(d.getDate() - offset)
   return d
+}
+
+/** @deprecated Utiliser weekStartOf (semaine mardi → lundi). */
+export function mondayOf(date: Date): Date {
+  return weekStartOf(date)
 }
 
 /** Numéro de semaine ISO (1..53). */
@@ -332,6 +337,8 @@ export interface WeeklyClosingInput {
   otherExpensesTTC: number
   /** Coût de revient TTC des articles vendus. Auto-rempli, ajustable. */
   costOfGoodsTTC: number
+  /** Espèces en caisse à la fin de la semaine (comptage physique). */
+  cashOnHandTTC: number
   notes?: string | null
 }
 
@@ -352,7 +359,7 @@ export function weeklyMargin(input: Pick<WeeklyClosingInput, 'revenueTTC' | 'cos
 }
 
 export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: string) {
-  const weekStart = mondayOf(input.weekStart)
+  const weekStart = weekStartOf(input.weekStart)
   const weekEnd = new Date(weekStart)
   weekEnd.setDate(weekEnd.getDate() + 7)
 
@@ -375,6 +382,7 @@ export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: 
         expensesTTC: toDecimalString(input.expensesTTC),
         otherExpensesTTC: toDecimalString(input.otherExpensesTTC),
         costOfGoodsTTC: toDecimalString(input.costOfGoodsTTC),
+        cashOnHandTTC: toDecimalString(input.cashOnHandTTC),
         notes: input.notes ?? null,
         createdById,
       },
@@ -384,6 +392,7 @@ export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: 
         expensesTTC: toDecimalString(input.expensesTTC),
         otherExpensesTTC: toDecimalString(input.otherExpensesTTC),
         costOfGoodsTTC: toDecimalString(input.costOfGoodsTTC),
+        cashOnHandTTC: toDecimalString(input.cashOnHandTTC),
         notes: input.notes ?? null,
       },
     })
@@ -414,7 +423,7 @@ export async function getWeeklyClosing(id: string) {
 
 export async function getWeeklyClosingByWeek(date: Date) {
   return db.weeklyClosing.findUnique({
-    where: { weekStart: mondayOf(date) },
+    where: { weekStart: weekStartOf(date) },
     include: { createdBy: { select: { name: true } } },
   })
 }
