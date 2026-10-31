@@ -362,6 +362,42 @@ export async function registerPayment(input: {
   })
 }
 
+export async function updateInvoicePaymentStatus(input: {
+  invoiceId: string
+  paidAmount: number
+  status?: InvoiceStatus
+  createdById?: string
+}) {
+  return db.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findUnique({ where: { id: input.invoiceId } })
+    if (!invoice) throw new Error('Facture introuvable')
+
+    if (invoice.status === InvoiceStatus.DRAFT || invoice.status === InvoiceStatus.CANCELLED) {
+      throw new Error('Impossible de modifier le règlement pour une facture brouillon ou annulée')
+    }
+
+    const totalTTC = Number(invoice.totalTTC)
+    let paidAmount = roundMoney(Number(input.paidAmount))
+    if (paidAmount < 0) paidAmount = 0
+    if (paidAmount > totalTTC + 0.001) paidAmount = roundMoney(totalTTC)
+
+    let status = input.status
+    if (paidAmount <= 0.001) {
+      status = InvoiceStatus.VALIDATED
+    } else if (paidAmount >= totalTTC - 0.001) {
+      status = InvoiceStatus.PAID
+      paidAmount = roundMoney(totalTTC)
+    } else {
+      status = InvoiceStatus.PARTIALLY_PAID
+    }
+
+    return tx.invoice.update({
+      where: { id: input.invoiceId },
+      data: { paidAmount: toDecimalString(paidAmount), status },
+    })
+  })
+}
+
 /** Facture générée à partir d'une commande en ligne confirmée. */
 export async function createInvoiceFromOnlineOrder(
   onlineOrderId: string,

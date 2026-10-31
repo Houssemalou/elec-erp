@@ -19,6 +19,7 @@ import {
   Wallet,
   CalendarCheck,
   HandCoins,
+  ArrowLeftRight,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -44,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard, roles: ALL_STAFF },
       { href: '/finance', label: 'Finance', icon: PiggyBank, roles: MANAGER },
+      { href: '/tresorerie', label: 'Trésorerie', icon: ArrowLeftRight, roles: MANAGER },
       { href: '/depenses', label: 'Dépenses', icon: Wallet, roles: MANAGER },
       { href: '/clotures', label: 'Clôtures', icon: CalendarCheck, roles: MANAGER },
       { href: '/creances', label: 'Créances', icon: HandCoins, roles: MANAGER },

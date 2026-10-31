@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button, Input, Select, Label, Textarea } from '@/components/ui'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { calculateDocumentTotals, calculateLineTotal, roundMoney } from '@elec/contracts'
 import { money } from '@/lib/utils'
 import { startActionLoader, stopActionLoader } from '@/lib/action-events'
@@ -114,6 +115,16 @@ export function DocumentForm({
   const [pending, startTransition] = useTransition()
   const [companyName, setCompanyName] = useState(
     partyOptions.find((o) => o.id === defaultPartyId)?.companyName ?? '',
+  )
+
+  const productOptions = useMemo(
+    () =>
+      products.map((p) => ({
+        value: p.id,
+        label: `${p.sku} · ${p.name}`,
+        keywords: `${p.sku} ${p.name}`,
+      })),
+    [products],
   )
 
   const addLine = () =>
@@ -387,18 +398,16 @@ export function DocumentForm({
             {lines.map((l) => (
               <tr key={l.key} className="border-b border-[#2A2A2A]">
                 <td className="px-2 py-1.5">
-                  <Select
+                  <SearchableSelect
                     value={l.productId}
-                    onChange={(e) => pickProduct(l.key, e.target.value)}
+                    onChange={(value) => pickProduct(l.key, value)}
+                    options={productOptions}
+                    emptyLabel="— Libre —"
+                    placeholder="— Libre —"
+                    searchPlaceholder="Rechercher un produit…"
+                    ariaLabel="Produit"
                     className="w-full"
-                  >
-                    <option value="">— Libre —</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.sku} · {p.name}
-                      </option>
-                    ))}
-                  </Select>
+                  />
                 </td>
                 <td className="px-2 py-1.5">
                   <Input

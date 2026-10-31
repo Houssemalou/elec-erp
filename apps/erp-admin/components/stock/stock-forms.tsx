@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { SlidersHorizontal, ArrowLeftRight, ClipboardCheck, Loader2 } from 'lucide-react'
 import { Button, Input, Select, Label } from '@/components/ui'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { startActionLoader, stopActionLoader } from '@/lib/action-events'
 
 export interface StockProduct {
@@ -23,6 +24,13 @@ export interface InventoryProduct {
   name: string
   theoretical: number
 }
+
+const toProductOptions = (products: StockProduct[]) =>
+  products.map((p) => ({
+    value: p.id,
+    label: `${p.sku} · ${p.name}`,
+    keywords: `${p.sku} ${p.name}`,
+  }))
 
 interface Props {
   products: StockProduct[]
@@ -161,12 +169,15 @@ function AdjustForm({
     >
       <div>
         <Label>Produit</Label>
-        <Select name="productId" required>
-          <option value="">— Choisir —</option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="productId"
+          required
+          options={toProductOptions(products)}
+          emptyLabel="— Choisir —"
+          placeholder="— Choisir —"
+          searchPlaceholder="Rechercher un produit…"
+          ariaLabel="Produit"
+        />
       </div>
       <div>
         <Label>Dépôt</Label>
@@ -219,12 +230,15 @@ function TransferForm({
     >
       <div>
         <Label>Produit</Label>
-        <Select name="productId" required>
-          <option value="">— Choisir —</option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>
-          ))}
-        </Select>
+        <SearchableSelect
+          name="productId"
+          required
+          options={toProductOptions(products)}
+          emptyLabel="— Choisir —"
+          placeholder="— Choisir —"
+          searchPlaceholder="Rechercher un produit…"
+          ariaLabel="Produit"
+        />
       </div>
       <div>
         <Label>Dépôt source</Label>

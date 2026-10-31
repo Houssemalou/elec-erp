@@ -1,4 +1,4 @@
-'use server'
+﻿'use server'
 
 import { revalidatePath } from 'next/cache'
 import {
@@ -17,6 +17,7 @@ import {
   validateInvoice,
   cancelInvoice,
   registerPayment,
+  updateInvoicePaymentStatus,
   convertQuoteToInvoice,
   createInvoiceFromOnlineOrder,
   createQuote,
@@ -93,7 +94,7 @@ function numOrNull(fd: FormData, key: string): number | null {
 /**
  * Date issue d'un `<input type="date">` (format `YYYY-MM-DD`).
  *
- * `new Date('2026-02-02')` est interprété en UTC : à Tunis le lundi deviendrait
+ * `new Date('2026-02-02')` est interprÃ©tÃ© en UTC : Ã  Tunis le lundi deviendrait
  * dimanche. On force donc une lecture en heure locale.
  */
 function dateOrNull(fd: FormData, key: string): Date | null {
@@ -104,7 +105,7 @@ function dateOrNull(fd: FormData, key: string): Date | null {
   return new Date(y, m - 1, d)
 }
 
-/** Enregistre le nom de société (client commercial) saisi dans la section client. */
+/** Enregistre le nom de sociÃ©tÃ© (client commercial) saisi dans la section client. */
 async function applyCompanyName(customerId: string, fd: FormData) {
   const companyName = str(fd, 'companyName')
   if (!customerId || !companyName) return
@@ -128,12 +129,12 @@ function slugify(input: string): string {
 }
 
 /**
- * Lignes de document sérialisées en JSON dans le champ `lines`.
+ * Lignes de document sÃ©rialisÃ©es en JSON dans le champ `lines`.
  *
  * Le prix transmis est TOUJOURS le PU TTC : c'est la valeur saisie dans le
- * formulaire (`DocumentForm` n'expose qu'un champ TTC) et la seule référence.
- * `unitPriceTTC` est donc lu ici, et non `unitPriceHT` — lire ce dernier
- * renvoyait systématiquement 0, toutes les lignes tombaient à zéro.
+ * formulaire (`DocumentForm` n'expose qu'un champ TTC) et la seule rÃ©fÃ©rence.
+ * `unitPriceTTC` est donc lu ici, et non `unitPriceHT` â€” lire ce dernier
+ * renvoyait systÃ©matiquement 0, toutes les lignes tombaient Ã  zÃ©ro.
  */
 function parseLines(fd: FormData): Array<{
   productId: string | null
@@ -177,19 +178,19 @@ async function nextProductSku(preRef: string) {
     if (/^\d+$/.test(suffix)) max = Math.max(max, parseInt(suffix, 10))
   }
   const next = max + 1
-  if (next > 999) throw new Error('Limite de 999 références atteinte pour cette pré-référence')
+  if (next > 999) throw new Error('Limite de 999 rÃ©fÃ©rences atteinte pour cette prÃ©-rÃ©fÃ©rence')
   return preRef + String(next).padStart(3, '0')
 }
 
-/** Retourne l'utilisateur courant si autorisé, sinon null. */
+/** Retourne l'utilisateur courant si autorisÃ©, sinon null. */
 function clean(users: Role[] = STAFF_ROLES) {
   return requireRole(users).then((r) => (r.allowed && r.session?.user ? r.session.user : null))
 }
 
 /**
- * Rafraîchit toutes les vues concernées par une vente : après une annulation
- * (ou une création) le stock, le chiffre d'affaires, l'historique des ventes en
- * caisse, les factures et les commandes doivent tous afficher l'état à jour.
+ * RafraÃ®chit toutes les vues concernÃ©es par une vente : aprÃ¨s une annulation
+ * (ou une crÃ©ation) le stock, le chiffre d'affaires, l'historique des ventes en
+ * caisse, les factures et les commandes doivent tous afficher l'Ã©tat Ã  jour.
  */
 function revalidateAfterSaleChange(extraPath?: string) {
   revalidatePath('/pos')
@@ -203,20 +204,20 @@ function revalidateAfterSaleChange(extraPath?: string) {
 }
 
 // ============================================================================
-// Catégories
+// CatÃ©gories
 // ============================================================================
 
 export async function createCategory(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const name = str(fd, 'name')
   if (!name) return { success: false, error: 'Le nom est obligatoire' }
   const slug = str(fd, 'slug') || slugify(name)
   const preRef = (str(fd, 'preRef') || '').trim() || null
-  if (preRef && preRef.length > 5) return { success: false, error: 'La pré-référence ne peut pas dépasser 5 caractères' }
+  if (preRef && preRef.length > 5) return { success: false, error: 'La prÃ©-rÃ©fÃ©rence ne peut pas dÃ©passer 5 caractÃ¨res' }
 
   const existing = await db.category.findUnique({ where: { slug } })
-  if (existing) return { success: false, error: `Une catégorie existe déjà avec le slug « ${slug} »` }
+  if (existing) return { success: false, error: `Une catÃ©gorie existe dÃ©jÃ  avec le slug Â« ${slug} Â»` }
 
   const cat = await db.category.create({
     data: {
@@ -238,14 +239,14 @@ export async function createCategory(fd: FormData): Promise<ActionResult> {
 
 export async function updateCategory(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const name = str(fd, 'name')
   if (!name) return { success: false, error: 'Le nom est obligatoire' }
   const slug = str(fd, 'slug') || slugify(name)
   const preRef = (str(fd, 'preRef') || '').trim() || null
-  if (preRef && preRef.length > 5) return { success: false, error: 'La pré-référence ne peut pas dépasser 5 caractères' }
+  if (preRef && preRef.length > 5) return { success: false, error: 'La prÃ©-rÃ©fÃ©rence ne peut pas dÃ©passer 5 caractÃ¨res' }
   const clash = await db.category.findFirst({ where: { slug, NOT: { id } } })
-  if (clash) return { success: false, error: 'Une autre catégorie utilise déjà ce slug' }
+  if (clash) return { success: false, error: 'Une autre catÃ©gorie utilise dÃ©jÃ  ce slug' }
 
   await db.category.update({
     where: { id },
@@ -268,12 +269,12 @@ export async function updateCategory(id: string, fd: FormData): Promise<ActionRe
 
 export async function deleteCategory(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const products = await db.product.count({ where: { categoryId: id } })
   if (products > 0) {
     return {
       success: false,
-      error: `Impossible de supprimer : ${products} produit(s) sont rattachés à cette catégorie.`,
+      error: `Impossible de supprimer : ${products} produit(s) sont rattachÃ©s Ã  cette catÃ©gorie.`,
     }
   }
   await db.category.delete({ where: { id } })
@@ -295,7 +296,7 @@ function parseImageList(fd: FormData): string[] {
       return parsed.filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
     }
   } catch {
-    // ignore — on essaie une saisie ligne par ligne / virgule
+    // ignore â€” on essaie une saisie ligne par ligne / virgule
   }
   return raw
     .split(/[\n,]/)
@@ -305,12 +306,12 @@ function parseImageList(fd: FormData): string[] {
 
 export async function createProduct(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
 
   const name = str(fd, 'name')
   if (!name) return { success: false, error: 'Le nom est obligatoire' }
   const priceTTC = num(fd, 'priceTTC')
-  if (priceTTC <= 0) return { success: false, error: 'Le prix de vente TTC doit être positif' }
+  if (priceTTC <= 0) return { success: false, error: 'Le prix de vente TTC doit Ãªtre positif' }
   const taxRateId = str(fd, 'taxRateId')
   if (!taxRateId) return { success: false, error: 'Un taux de TVA est obligatoire' }
   const categoryId = str(fd, 'categoryId') || null
@@ -322,7 +323,7 @@ export async function createProduct(fd: FormData): Promise<ActionResult> {
     const category = await db.category.findUnique({ where: { id: categoryId }, select: { preRef: true } })
     if (category?.preRef) sku = await nextProductSku(category.preRef)
   }
-  if (!sku) return { success: false, error: 'La référence est obligatoire' }
+  if (!sku) return { success: false, error: 'La rÃ©fÃ©rence est obligatoire' }
 
   const slug = str(fd, 'slug') || slugify(`${name}-${sku}`)
   const images = parseImageList(fd)
@@ -339,7 +340,7 @@ export async function createProduct(fd: FormData): Promise<ActionResult> {
         priceHT,
         priceTTC,
         costPrice: numOrNull(fd, 'costPrice'),
-        unit: str(fd, 'unit') || 'unité',
+        unit: str(fd, 'unit') || 'unitÃ©',
         weightKg: numOrNull(fd, 'weightKg'),
         categoryId,
         taxRateId,
@@ -366,18 +367,18 @@ export async function createProduct(fd: FormData): Promise<ActionResult> {
 
 export async function updateProduct(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
 
   const sku = str(fd, 'sku')
   const name = str(fd, 'name')
-  if (!sku || !name) return { success: false, error: 'Référence et nom sont obligatoires' }
+  if (!sku || !name) return { success: false, error: 'RÃ©fÃ©rence et nom sont obligatoires' }
   const taxRateId = str(fd, 'taxRateId')
   if (!taxRateId) return { success: false, error: 'Un taux de TVA est obligatoire' }
 
   const slug = str(fd, 'slug') || slugify(`${name}-${sku}`)
   const images = parseImageList(fd)
   const priceTTC = num(fd, 'priceTTC')
-  if (priceTTC <= 0) return { success: false, error: 'Le prix de vente TTC doit être positif' }
+  if (priceTTC <= 0) return { success: false, error: 'Le prix de vente TTC doit Ãªtre positif' }
   const taxRate = await db.taxRate.findUnique({ where: { id: taxRateId }, select: { rate: true } })
   const priceHT = roundMoney(priceTTC / (1 + Number(taxRate?.rate ?? 0) / 100))
 
@@ -396,7 +397,7 @@ export async function updateProduct(id: string, fd: FormData): Promise<ActionRes
           priceHT,
           priceTTC,
           costPrice: numOrNull(fd, 'costPrice'),
-          unit: str(fd, 'unit') || 'unité',
+          unit: str(fd, 'unit') || 'unitÃ©',
           weightKg: numOrNull(fd, 'weightKg'),
           categoryId: str(fd, 'categoryId') || null,
           taxRateId,
@@ -420,7 +421,7 @@ export async function updateProduct(id: string, fd: FormData): Promise<ActionRes
 
 export async function deleteProduct(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const used = await db.onlineOrderItem.count({ where: { productId: id } })
   if (used > 0) {
     return { success: false, error: `Impossible de supprimer : le produit figure dans ${used} commande(s).` }
@@ -432,7 +433,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 
 export async function toggleProductActive(id: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const p = await db.product.findUnique({ where: { id } })
   if (!p) return { success: false, error: 'Produit introuvable' }
   await db.product.update({ where: { id }, data: { isActive: !p.isActive } })
@@ -441,19 +442,19 @@ export async function toggleProductActive(id: string): Promise<ActionResult> {
 }
 
 // ============================================================================
-// Stock — gestion manuelle (ajustement, transfert, inventaire)
+// Stock â€” gestion manuelle (ajustement, transfert, inventaire)
 // ============================================================================
 
 export async function adjustStockAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const productId = str(fd, 'productId')
   const warehouseId = str(fd, 'warehouseId')
   const quantity = num(fd, 'quantity')
   const reason = str(fd, 'reason')
-  if (!productId || !warehouseId) return { success: false, error: 'Produit et dépôt obligatoires' }
-  if (quantity === 0) return { success: false, error: 'La quantité ne peut pas être nulle' }
-  if (reason.length < 3) return { success: false, error: 'Le motif est obligatoire (perte, casse, inventaire…)' }
+  if (!productId || !warehouseId) return { success: false, error: 'Produit et dÃ©pÃ´t obligatoires' }
+  if (quantity === 0) return { success: false, error: 'La quantitÃ© ne peut pas Ãªtre nulle' }
+  if (reason.length < 3) return { success: false, error: 'Le motif est obligatoire (perte, casse, inventaireâ€¦)' }
 
   try {
     await adjustStock({
@@ -473,15 +474,15 @@ export async function adjustStockAction(fd: FormData): Promise<ActionResult> {
 
 export async function transferStockAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const productId = str(fd, 'productId')
   const fromWarehouseId = str(fd, 'fromWarehouseId')
   const toWarehouseId = str(fd, 'toWarehouseId')
   const quantity = num(fd, 'quantity')
   if (!productId || !fromWarehouseId || !toWarehouseId) {
-    return { success: false, error: 'Produit, dépôt source et dépôt destination obligatoires' }
+    return { success: false, error: 'Produit, dÃ©pÃ´t source et dÃ©pÃ´t destination obligatoires' }
   }
-  if (quantity <= 0) return { success: false, error: 'La quantité doit être positive' }
+  if (quantity <= 0) return { success: false, error: 'La quantitÃ© doit Ãªtre positive' }
 
   try {
     await transferStock({ productId, fromWarehouseId, toWarehouseId, quantity, userId: user.id })
@@ -494,9 +495,9 @@ export async function transferStockAction(fd: FormData): Promise<ActionResult> {
 
 export async function runInventoryAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const warehouseId = str(fd, 'warehouseId')
-  if (!warehouseId) return { success: false, error: 'Dépôt obligatoire' }
+  if (!warehouseId) return { success: false, error: 'DÃ©pÃ´t obligatoire' }
 
   let entries: Array<{ productId: string; actualQuantity: number }> = []
   const raw = str(fd, 'lines')
@@ -507,10 +508,10 @@ export async function runInventoryAction(fd: FormData): Promise<ActionResult> {
         .filter((l) => l.productId && Number.isFinite(Number(l.actualQuantity)))
         .map((l) => ({ productId: l.productId as string, actualQuantity: Number(l.actualQuantity) }))
     } catch {
-      return { success: false, error: 'Lignes d’inventaire invalides' }
+      return { success: false, error: 'Lignes dâ€™inventaire invalides' }
     }
   }
-  if (entries.length === 0) return { success: false, error: 'Aucune ligne d’inventaire' }
+  if (entries.length === 0) return { success: false, error: 'Aucune ligne dâ€™inventaire' }
 
   try {
     await runInventory(warehouseId, entries, user.id)
@@ -527,10 +528,10 @@ export async function runInventoryAction(fd: FormData): Promise<ActionResult> {
 
 export async function createCustomer(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const type = str(fd, 'type') === 'PROFESSIONNEL' ? 'PROFESSIONNEL' : 'PARTICULIER'
   if (type === 'PROFESSIONNEL' && !str(fd, 'companyName')) {
-    return { success: false, error: 'Le nom de société est obligatoire pour un professionnel' }
+    return { success: false, error: 'Le nom de sociÃ©tÃ© est obligatoire pour un professionnel' }
   }
   const c = await db.customer.create({
     data: {
@@ -552,10 +553,10 @@ export async function createCustomer(fd: FormData): Promise<ActionResult> {
 
 export async function updateCustomer(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const type = str(fd, 'type') === 'PROFESSIONNEL' ? 'PROFESSIONNEL' : 'PARTICULIER'
   if (type === 'PROFESSIONNEL' && !str(fd, 'companyName')) {
-    return { success: false, error: 'Le nom de société est obligatoire pour un professionnel' }
+    return { success: false, error: 'Le nom de sociÃ©tÃ© est obligatoire pour un professionnel' }
   }
   await db.customer.update({
     where: { id },
@@ -568,8 +569,8 @@ export async function updateCustomer(id: string, fd: FormData): Promise<ActionRe
       email: str(fd, 'email') || null,
       phone: str(fd, 'phone') || null,
       address: str(fd, 'address') || null,
-      // `city` n'est plus collecté dans l'ERP (un seul champ « Adresse ») :
-      // on ne l'écrase pas, la boutique en ligne le renseigne sur ses commandes.
+      // `city` n'est plus collectÃ© dans l'ERP (un seul champ Â« Adresse Â») :
+      // on ne l'Ã©crase pas, la boutique en ligne le renseigne sur ses commandes.
       notes: str(fd, 'notes') || null,
       active: check(fd, 'active'),
     },
@@ -581,7 +582,7 @@ export async function updateCustomer(id: string, fd: FormData): Promise<ActionRe
 
 export async function deleteCustomer(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const doc = await db.onlineOrder.count({ where: { customerId: id } })
   if (doc > 0) return { success: false, error: 'Impossible de supprimer : le client a des commandes.' }
   await db.customer.delete({ where: { id } })
@@ -595,7 +596,7 @@ export async function deleteCustomer(id: string): Promise<ActionResult> {
 
 export async function createSupplier(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const name = str(fd, 'name')
   if (!name) return { success: false, error: 'Le nom est obligatoire' }
   const s = await db.supplier.create({
@@ -617,7 +618,7 @@ export async function createSupplier(fd: FormData): Promise<ActionResult> {
 
 export async function updateSupplier(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   if (!str(fd, 'name')) return { success: false, error: 'Le nom est obligatoire' }
   await db.supplier.update({
     where: { id },
@@ -640,12 +641,12 @@ export async function updateSupplier(id: string, fd: FormData): Promise<ActionRe
 
 export async function deleteSupplier(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const used = await db.purchaseOrder.count({ where: { supplierId: id } })
   const usedInvoices = await db.purchaseInvoice.count({ where: { supplierId: id } })
   if (used > 0) return { success: false, error: 'Impossible de supprimer : des bons de commande existent.' }
   if (usedInvoices > 0) {
-    return { success: false, error: 'Impossible de supprimer : des factures d’achat existent.' }
+    return { success: false, error: 'Impossible de supprimer : des factures dâ€™achat existent.' }
   }
   await db.supplier.delete({ where: { id } })
   revalidatePath('/fournisseurs')
@@ -658,7 +659,7 @@ export async function deleteSupplier(id: string): Promise<ActionResult> {
 
 export async function createQuoteAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const customerId = str(fd, 'customerId') || null
   const customerName = str(fd, 'customerName') || null
   const lines = parseLines(fd)
@@ -687,7 +688,7 @@ export async function createQuoteAction(fd: FormData): Promise<ActionResult> {
 
 export async function updateQuoteAction(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const customerId = str(fd, 'customerId') || null
   const customerName = str(fd, 'customerName') || null
   const lines = parseLines(fd)
@@ -716,7 +717,7 @@ export async function updateQuoteAction(id: string, fd: FormData): Promise<Actio
 
 export async function deleteQuoteAction(id: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await deleteQuote(id)
     revalidatePath('/devis')
@@ -728,7 +729,7 @@ export async function deleteQuoteAction(id: string): Promise<ActionResult> {
 
 export async function setQuoteStatusAction(id: string, status: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   await setQuoteStatus(id, status as QuoteStatus)
   revalidatePath('/devis')
   revalidatePath(`/devis/${id}`)
@@ -741,7 +742,7 @@ export async function setQuoteStatusAction(id: string, status: string): Promise<
 
 export async function createInvoiceAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const customerId = str(fd, 'customerId') || null
   const customerName = str(fd, 'customerName') || null
   const customerMatricule = str(fd, 'customerMatricule') || null
@@ -773,7 +774,7 @@ export async function createInvoiceAction(fd: FormData): Promise<ActionResult> {
 
 export async function validateInvoiceAction(id: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await validateInvoice(id, user.id)
     revalidatePath('/factures')
@@ -787,7 +788,7 @@ export async function validateInvoiceAction(id: string): Promise<ActionResult> {
 
 export async function cancelInvoiceAction(id: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await cancelInvoice(id, user.id)
     revalidateAfterSaleChange(`/factures/${id}`)
@@ -799,7 +800,7 @@ export async function cancelInvoiceAction(id: string): Promise<ActionResult> {
 
 export async function registerPaymentAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: "AccÃ¨s non autorisÃ©" }
   const invoiceId = str(fd, 'invoiceId')
   const amount = num(fd, 'amount')
   if (!invoiceId || amount <= 0) return { success: false, error: 'Montant invalide' }
@@ -815,6 +816,32 @@ export async function registerPaymentAction(fd: FormData): Promise<ActionResult>
     })
     revalidatePath('/factures')
     revalidatePath(`/factures/${invoiceId}`)
+    revalidatePath('/finance')
+    revalidatePath('/tresorerie')
+    revalidatePath('/creances')
+    return { success: true, id: invoiceId }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+export async function updateInvoicePaymentStatusAction(fd: FormData): Promise<ActionResult> {
+  const user = await clean(MANAGER_ROLES)
+  if (!user) return { success: false, error: "AccÃ¨s non autorisÃ©" }
+  const invoiceId = str(fd, 'invoiceId')
+  const paidAmount = num(fd, 'paidAmount')
+  if (!invoiceId) return { success: false, error: 'Facture manquante' }
+  try {
+    await updateInvoicePaymentStatus({
+      invoiceId,
+      paidAmount,
+      createdById: user.id,
+    })
+    revalidatePath('/factures')
+    revalidatePath(`/factures/${invoiceId}`)
+    revalidatePath('/finance')
+    revalidatePath('/tresorerie')
+    revalidatePath('/creances')
     return { success: true, id: invoiceId }
   } catch (e) {
     return { success: false, error: (e as Error).message }
@@ -823,7 +850,7 @@ export async function registerPaymentAction(fd: FormData): Promise<ActionResult>
 
 export async function convertQuoteToInvoiceAction(quoteId: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     const inv = await convertQuoteToInvoice(quoteId, user.id)
     revalidatePath('/devis')
@@ -841,11 +868,11 @@ export async function convertQuoteToInvoiceAction(quoteId: string): Promise<Acti
 
 export async function createCreditNoteAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const invoiceId = str(fd, 'invoiceId')
   const reason = str(fd, 'reason')
   const lines = parseLines(fd)
-  if (!invoiceId) return { success: false, error: 'La facture d’origine est obligatoire' }
+  if (!invoiceId) return { success: false, error: 'La facture dâ€™origine est obligatoire' }
   if (reason.length < 3) return { success: false, error: 'Le motif est obligatoire' }
   if (lines.length === 0) return { success: false, error: 'Ajoutez au moins une ligne' }
 
@@ -861,7 +888,7 @@ export async function createCreditNoteAction(fd: FormData): Promise<ActionResult
 
 export async function validateCreditNoteAction(id: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await validateCreditNote(id)
     revalidatePath('/avoirs')
@@ -880,10 +907,10 @@ export async function validateCreditNoteAction(id: string): Promise<ActionResult
 
 export async function createPurchaseOrderAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const supplierId = str(fd, 'supplierId')
   if (!supplierId) return { success: false, error: 'Le fournisseur est obligatoire' }
-  // Le bon de commande attend un PU HT : on déduit le HT du PU TTC saisi.
+  // Le bon de commande attend un PU HT : on dÃ©duit le HT du PU TTC saisi.
   const lines = parseLines(fd).map((l) => ({
     productId: l.productId as string,
     quantity: l.quantity,
@@ -909,7 +936,7 @@ export async function createPurchaseOrderAction(fd: FormData): Promise<ActionRes
 
 export async function receivePurchaseOrderAction(id: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await receivePurchaseOrder(id)
     revalidatePath('/achats')
@@ -923,7 +950,7 @@ export async function receivePurchaseOrderAction(id: string): Promise<ActionResu
 
 export async function setPurchaseOrderStatusAction(id: string, status: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   await setPurchaseOrderStatus(id, status as PurchaseOrderStatus)
   revalidatePath('/achats')
   revalidatePath(`/achats/${id}`)
@@ -931,12 +958,12 @@ export async function setPurchaseOrderStatusAction(id: string, status: string): 
 }
 
 // ============================================================================
-// Factures d'achat (achats) — factures reçues des fournisseurs
+// Factures d'achat (achats) â€” factures reÃ§ues des fournisseurs
 // ============================================================================
 
 export async function createPurchaseInvoiceAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const supplierId = str(fd, 'supplierId')
   if (!supplierId) return { success: false, error: 'Le fournisseur est obligatoire' }
   const lines = parseLines(fd)
@@ -962,7 +989,7 @@ export async function createPurchaseInvoiceAction(fd: FormData): Promise<ActionR
 
 export async function validatePurchaseInvoiceAction(id: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await validatePurchaseInvoice(id, user.id)
     revalidatePath('/achats')
@@ -977,7 +1004,7 @@ export async function validatePurchaseInvoiceAction(id: string): Promise<ActionR
 
 export async function cancelPurchaseInvoiceAction(id: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await cancelPurchaseInvoice(id, user.id)
     revalidatePath('/achats')
@@ -995,7 +1022,7 @@ export async function cancelPurchaseInvoiceAction(id: string): Promise<ActionRes
 
 export async function confirmOrderAction(id: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await confirmOrder(id)
     revalidatePath('/commandes')
@@ -1009,7 +1036,7 @@ export async function confirmOrderAction(id: string): Promise<ActionResult> {
 
 export async function cancelOrderAction(id: string, reason?: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await cancelOrder(id, user.id, reason)
     revalidateAfterSaleChange(`/commandes/${id}`)
@@ -1021,7 +1048,7 @@ export async function cancelOrderAction(id: string, reason?: string): Promise<Ac
 
 export async function updateOrderStatusAction(id: string, status: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await updateOrderStatus(id, status as OnlineOrderStatus)
     revalidateAfterSaleChange(`/commandes/${id}`)
@@ -1033,7 +1060,7 @@ export async function updateOrderStatusAction(id: string, status: string): Promi
 
 export async function markOrderPaidAction(id: string, method: string): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await markOrderPaid(id, method as 'CARD' | 'EDAHABIA' | 'BANK_TRANSFER')
     revalidatePath('/commandes')
@@ -1046,7 +1073,7 @@ export async function markOrderPaidAction(id: string, method: string): Promise<A
 
 export async function createInvoiceFromOrderAction(id: string, fd?: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
 
   let discountType: 'PERCENT' | 'AMOUNT' | null = null
   let discountValue = 0
@@ -1075,14 +1102,14 @@ export async function createInvoiceFromOrderAction(id: string, fd?: FormData): P
 
 export async function createUser(fd: FormData): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const email = str(fd, 'email')
   const name = str(fd, 'name')
   const password = str(fd, 'password')
   if (!email || !name) return { success: false, error: 'Email et nom obligatoires' }
-  if (password.length < 8) return { success: false, error: 'Mot de passe : 8 caractères minimum' }
+  if (password.length < 8) return { success: false, error: 'Mot de passe : 8 caractÃ¨res minimum' }
   const existing = await db.user.findUnique({ where: { email } })
-  if (existing) return { success: false, error: 'Un utilisateur existe déjà avec cet email' }
+  if (existing) return { success: false, error: 'Un utilisateur existe dÃ©jÃ  avec cet email' }
 
   const u = await db.user.create({
     data: {
@@ -1100,7 +1127,7 @@ export async function createUser(fd: FormData): Promise<ActionResult> {
 
 export async function updateUser(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const data: {
     name: string
     role: Role
@@ -1116,7 +1143,7 @@ export async function updateUser(id: string, fd: FormData): Promise<ActionResult
   if (!data.name) return { success: false, error: 'Le nom est obligatoire' }
   const password = str(fd, 'password')
   if (password) {
-    if (password.length < 8) return { success: false, error: 'Mot de passe : 8 caractères minimum' }
+    if (password.length < 8) return { success: false, error: 'Mot de passe : 8 caractÃ¨res minimum' }
     data.passwordHash = await hash(password, 10)
   }
   await db.user.update({ where: { id }, data })
@@ -1126,7 +1153,7 @@ export async function updateUser(id: string, fd: FormData): Promise<ActionResult
 
 export async function deleteUser(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   if (user.id === id) return { success: false, error: 'Vous ne pouvez pas supprimer votre propre compte' }
   await db.user.delete({ where: { id } })
   revalidatePath('/utilisateurs')
@@ -1134,16 +1161,16 @@ export async function deleteUser(id: string): Promise<ActionResult> {
 }
 
 // ============================================================================
-// Paramètres magasin
+// ParamÃ¨tres magasin
 // ============================================================================
 
 export async function updateStoreSettings(fd: FormData): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   await db.storeSettings.update({
     where: { id: 1 },
     data: {
-      storeName: str(fd, 'storeName') || 'Magasin Électrique',
+      storeName: str(fd, 'storeName') || 'Magasin Ã‰lectrique',
       slogan: str(fd, 'slogan') || null,
       activity: str(fd, 'activity') || null,
       address: str(fd, 'address') || null,
@@ -1164,8 +1191,8 @@ export async function updateStoreSettings(fd: FormData): Promise<ActionResult> {
 }
 
 // ============================================================================
-// Dépenses — charges hors achats (loyer, salaires, énergie, transport…)
-// Montants saisis en TTC : l'entreprise n'est pas assujettie à la TVA.
+// DÃ©penses â€” charges hors achats (loyer, salaires, Ã©nergie, transportâ€¦)
+// Montants saisis en TTC : l'entreprise n'est pas assujettie Ã  la TVA.
 // ============================================================================
 
 const EXPENSE_CATEGORIES: ExpenseCategory[] = [
@@ -1188,19 +1215,19 @@ const EXPENSE_PAYMENT_METHODS: PaymentMethod[] = [
   'ONLINE',
 ]
 
-/** Valide le payload d'une dépense. Partagé par la création et la mise à jour. */
+/** Valide le payload d'une dÃ©pense. PartagÃ© par la crÃ©ation et la mise Ã  jour. */
 function parseExpense(fd: FormData): { ok: true; data: ExpenseInput } | { ok: false; error: string } {
   const label = str(fd, 'label')
-  if (!label) return { ok: false, error: 'Le libellé est obligatoire' }
+  if (!label) return { ok: false, error: 'Le libellÃ© est obligatoire' }
 
   const amountTTC = num(fd, 'amountTTC')
-  if (!(amountTTC > 0)) return { ok: false, error: 'Le montant doit être supérieur à zéro' }
+  if (!(amountTTC > 0)) return { ok: false, error: 'Le montant doit Ãªtre supÃ©rieur Ã  zÃ©ro' }
 
   const category = str(fd, 'category') as ExpenseCategory
-  if (!EXPENSE_CATEGORIES.includes(category)) return { ok: false, error: 'Catégorie invalide' }
+  if (!EXPENSE_CATEGORIES.includes(category)) return { ok: false, error: 'CatÃ©gorie invalide' }
 
   const paymentMethod = str(fd, 'paymentMethod') as PaymentMethod
-  if (!EXPENSE_PAYMENT_METHODS.includes(paymentMethod)) return { ok: false, error: 'Moyen de règlement invalide' }
+  if (!EXPENSE_PAYMENT_METHODS.includes(paymentMethod)) return { ok: false, error: 'Moyen de rÃ¨glement invalide' }
 
   return {
     ok: true,
@@ -1215,7 +1242,7 @@ function parseExpense(fd: FormData): { ok: true; data: ExpenseInput } | { ok: fa
   }
 }
 
-/** La liste et l'onglet Finance doivent.refresh après toute écriture. */
+/** La liste et l'onglet Finance doivent.refresh aprÃ¨s toute Ã©criture. */
 function revalidateAfterExpenseChange(extraPath?: string) {
   revalidatePath('/depenses')
   revalidatePath('/finance')
@@ -1224,7 +1251,7 @@ function revalidateAfterExpenseChange(extraPath?: string) {
 
 export async function createExpenseAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const parsed = parseExpense(fd)
   if (!parsed.ok) return { success: false, error: parsed.error }
 
@@ -1239,7 +1266,7 @@ export async function createExpenseAction(fd: FormData): Promise<ActionResult> {
 
 export async function updateExpenseAction(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const parsed = parseExpense(fd)
   if (!parsed.ok) return { success: false, error: parsed.error }
 
@@ -1254,7 +1281,7 @@ export async function updateExpenseAction(id: string, fd: FormData): Promise<Act
 
 export async function deleteExpense(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await deleteExpenseService(id)
     revalidateAfterExpenseChange()
@@ -1265,19 +1292,19 @@ export async function deleteExpense(id: string): Promise<ActionResult> {
 }
 
 // ============================================================================
-// Créances clients — saisie libre, encaissement, suppression
+// CrÃ©ances clients â€” saisie libre, encaissement, suppression
 // ============================================================================
 
 const RECEIVABLE_STATUSES: ReceivableStatus[] = ['OPEN', 'PARTIALLY_PAID', 'PAID', 'CANCELLED']
 const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'EDAHABIA', 'ONLINE']
 
-/** Valide le payload d'une créance libre. Partagé par création et mise à jour. */
+/** Valide le payload d'une crÃ©ance libre. PartagÃ© par crÃ©ation et mise Ã  jour. */
 function parseReceivable(fd: FormData): { ok: true; data: ReceivableInput } | { ok: false; error: string } {
   const customerName = str(fd, 'customerName')
   if (!customerName) return { ok: false, error: 'Le nom du client est obligatoire' }
 
   const amountTTC = num(fd, 'amountTTC')
-  if (!(amountTTC > 0)) return { ok: false, error: 'Le montant doit être supérieur à zéro' }
+  if (!(amountTTC > 0)) return { ok: false, error: 'Le montant doit Ãªtre supÃ©rieur Ã  zÃ©ro' }
 
   return {
     ok: true,
@@ -1299,7 +1326,7 @@ function revalidateAfterReceivableChange(extraPath?: string) {
 
 export async function createReceivableAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const parsed = parseReceivable(fd)
   if (!parsed.ok) return { success: false, error: parsed.error }
 
@@ -1314,7 +1341,7 @@ export async function createReceivableAction(fd: FormData): Promise<ActionResult
 
 export async function updateReceivableAction(id: string, fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const parsed = parseReceivable(fd)
   if (!parsed.ok) return { success: false, error: parsed.error }
 
@@ -1329,10 +1356,10 @@ export async function updateReceivableAction(id: string, fd: FormData): Promise<
 
 export async function registerReceivablePaymentAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
 
   const receivableId = str(fd, 'receivableId')
-  if (!receivableId) return { success: false, error: 'Créance introuvable' }
+  if (!receivableId) return { success: false, error: 'CrÃ©ance introuvable' }
 
   const method = str(fd, 'method') as PaymentMethod
   if (!PAYMENT_METHODS.includes(method)) return { success: false, error: 'Mode de paiement invalide' }
@@ -1357,7 +1384,7 @@ export async function registerReceivablePaymentAction(fd: FormData): Promise<Act
 
 export async function deleteReceivableAction(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await deleteReceivable(id)
     revalidateAfterReceivableChange()
@@ -1368,10 +1395,10 @@ export async function deleteReceivableAction(id: string): Promise<ActionResult> 
 }
 
 // ============================================================================
-// Clôtures hebdomadaires — saisie manuelle, verrouillage, réouverture
+// ClÃ´tures hebdomadaires â€” saisie manuelle, verrouillage, rÃ©ouverture
 // ============================================================================
 
-/** Valide le bilan saisi. Les montants sont en TTC et saisis à la main. */
+/** Valide le bilan saisi. Les montants sont en TTC et saisis Ã  la main. */
 function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput } | { ok: false; error: string } {
   const weekStart = dateOrNull(fd, 'weekStart') ?? dateOrNull(fd, 'issueDate')
   if (!weekStart) return { ok: false, error: 'La semaine est obligatoire' }
@@ -1391,7 +1418,7 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
     costOfGoodsTTC < 0 ||
     cashOnHandTTC < 0
   ) {
-    return { ok: false, error: 'Les montants ne peuvent pas être négatifs' }
+    return { ok: false, error: 'Les montants ne peuvent pas Ãªtre nÃ©gatifs' }
   }
 
   return {
@@ -1417,10 +1444,10 @@ export interface WeeklyAutoValues {
   missingCostLines?: number
 }
 
-/** Valeurs calculées automatiquement pour le lundi de la semaine voulue. */
+/** Valeurs calculÃ©es automatiquement pour le lundi de la semaine voulue. */
 export async function getWeeklyAutoValuesAction(weekStart: string): Promise<WeeklyAutoValues> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
 
   const date = new Date(weekStart)
   if (Number.isNaN(date.getTime())) return { success: false, error: 'Date invalide' }
@@ -1437,7 +1464,7 @@ export async function getWeeklyAutoValuesAction(weekStart: string): Promise<Week
 
 export async function saveWeeklyClosingAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   const parsed = parseWeeklyClosing(fd)
   if (!parsed.ok) return { success: false, error: parsed.error }
 
@@ -1453,7 +1480,7 @@ export async function saveWeeklyClosingAction(fd: FormData): Promise<ActionResul
 
 export async function closeWeeklyClosingAction(id: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await closeWeeklyClosing(id)
     revalidatePath('/clotures')
@@ -1466,7 +1493,7 @@ export async function closeWeeklyClosingAction(id: string): Promise<ActionResult
 
 export async function reopenWeeklyClosingAction(id: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await reopenWeeklyClosing(id)
     revalidatePath('/clotures')
@@ -1479,7 +1506,7 @@ export async function reopenWeeklyClosingAction(id: string): Promise<ActionResul
 
 export async function deleteWeeklyClosingAction(id: string): Promise<ActionResult> {
   const user = await clean(ADMIN_ROLE)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     await deleteWeeklyClosing(id)
     revalidatePath('/clotures')
@@ -1491,12 +1518,12 @@ export async function deleteWeeklyClosingAction(id: string): Promise<ActionResul
 }
 
 // ============================================================================
-// Point de Vente (POS) — Vente en caisse
+// Point de Vente (POS) â€” Vente en caisse
 // ============================================================================
 
 export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
   const user = await clean(STAFF_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
 
   const customerId = str(fd, 'customerId') || null
   const paymentMethod = str(fd, 'paymentMethod') as 'CASH' | 'CARD'
@@ -1525,7 +1552,7 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
     const address = str(fd, 'manualAddress')
     const matriculeFiscal = str(fd, 'manualMatricule')
     if (!firstName) {
-      return { success: false, error: 'Le nom du client est requis pour générer une facture' }
+      return { success: false, error: 'Le nom du client est requis pour gÃ©nÃ©rer une facture' }
     }
     manualClient = { firstName, lastName, companyName, address, matriculeFiscal }
   }
@@ -1534,7 +1561,7 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
   const discountType = str(fd, 'discountType') as 'PERCENT' | 'AMOUNT' | ''
   const discountValue = parseFloat(str(fd, 'discountValue') || '0')
 
-  // Décaissements affectés à la vente : où va l'argent encaissé.
+  // DÃ©caissements affectÃ©s Ã  la vente : oÃ¹ va l'argent encaissÃ©.
   let cashOutflows: Array<{ label: string; amountTTC: number; category: ExpenseCategory }> = []
   const rawOutflows = str(fd, 'cashOutflows')
   if (rawOutflows) {
@@ -1550,7 +1577,7 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
           .filter((o) => o.amountTTC > 0)
       }
     } catch {
-      return { success: false, error: 'Décaissements invalides' }
+      return { success: false, error: 'DÃ©caissements invalides' }
     }
   }
 
@@ -1583,13 +1610,13 @@ export async function createPosSaleAction(fd: FormData): Promise<ActionResult> {
 
 /**
  * Modification de la remise globale (en DT) d'une vente en caisse : le bon de
- * livraison est recalculé (HT/TVA/TTC) pour que le chiffre d'affaires, la marge
- * et le gain des ventes en caisse soient justes. La facture liée reste
- * inchangée (première version). Réservée aux encadrants.
+ * livraison est recalculÃ© (HT/TVA/TTC) pour que le chiffre d'affaires, la marge
+ * et le gain des ventes en caisse soient justes. La facture liÃ©e reste
+ * inchangÃ©e (premiÃ¨re version). RÃ©servÃ©e aux encadrants.
  */
 export async function updatePosSaleDiscountAction(id: string, discountTTC: number): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   if (!Number.isFinite(discountTTC) || discountTTC < 0) {
     return { success: false, error: 'Remise invalide' }
   }
@@ -1604,12 +1631,12 @@ export async function updatePosSaleDiscountAction(id: string, discountTTC: numbe
 
 /**
  * Annulation d'une vente en caisse depuis l'historique : le bon de livraison,
- * la facture liée, le chiffre d'affaires et le stock reviennent à l'état
- * antérieur. Réservée aux encadrants (le chiffre d'affaires est modifié).
+ * la facture liÃ©e, le chiffre d'affaires et le stock reviennent Ã  l'Ã©tat
+ * antÃ©rieur. RÃ©servÃ©e aux encadrants (le chiffre d'affaires est modifiÃ©).
  */
 export async function cancelPosSaleAction(id: string, reason?: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     const result = await cancelPosSale(id, user.id, reason)
     revalidateAfterSaleChange(`/ventes-caisse/${id}`)
@@ -1620,18 +1647,19 @@ export async function cancelPosSaleAction(id: string, reason?: string): Promise<
 }
 
 /**
- * Réactivation d'une vente en caisse annulée (« annuler l'annulation ») : le
- * bon de livraison et la facture liée repassent validés et le stock des
- * articles est à nouveau déduit. Réservée aux encadrants.
+ * RÃ©activation d'une vente en caisse annulÃ©e (Â« annuler l'annulation Â») : le
+ * bon de livraison et la facture liÃ©e repassent validÃ©s et le stock des
+ * articles est Ã  nouveau dÃ©duit. RÃ©servÃ©e aux encadrants.
  */
 export async function restorePosSaleAction(id: string): Promise<ActionResult> {
   const user = await clean(MANAGER_ROLES)
-  if (!user) return { success: false, error: 'Accès non autorisé' }
+  if (!user) return { success: false, error: 'AccÃ¨s non autorisÃ©' }
   try {
     const result = await restorePosSale(id, user.id)
     revalidateAfterSaleChange(`/ventes-caisse/${id}`)
     return { success: true, id, invoiceId: result.sale.invoiceId ?? undefined }
   } catch (e) {
     return { success: false, error: (e as Error).message }
-  }
+}
+
 }

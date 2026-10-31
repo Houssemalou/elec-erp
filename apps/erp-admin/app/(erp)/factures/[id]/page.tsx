@@ -6,11 +6,13 @@ import { ActionButton } from '@/components/ui/action-button'
 import { DocumentTotals } from '@/components/documents/document-totals'
 import { InvoiceMargin } from '@/components/documents/invoice-margin'
 import { PaymentForm } from '@/components/documents/payment-form'
+import { InvoicePaymentStatusForm } from '@/components/invoices/invoice-payment-status-form'
 import { InvoiceGenerateDialog } from '@/components/documents/invoice-generate-dialog'
 import {
   validateInvoiceAction,
   cancelInvoiceAction,
   registerPaymentAction,
+  updateInvoicePaymentStatusAction,
 } from '@/lib/actions/erp'
 import { db } from '@elec/db'
 import { calculateMarginTotals } from '@elec/contracts'
@@ -266,6 +268,12 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             <Card>
               <CardHeader title="Encaisser un paiement" />
               <PaymentForm invoiceId={invoice.id} remaining={remaining} action={registerPaymentAction} />
+            </Card>
+          ) : null}
+          {['VALIDATED', 'PAID', 'PARTIALLY_PAID'].includes(invoice.status) ? (
+            <Card>
+              <CardHeader title="Modifier le règlement (manuel)" subtitle="Forcer le statut payé/non payé/partiel" />
+              <InvoicePaymentStatusForm invoiceId={invoice.id} totalTTC={totalTTC} paidAmount={paid} action={updateInvoicePaymentStatusAction} />
             </Card>
           ) : null}
         </div>

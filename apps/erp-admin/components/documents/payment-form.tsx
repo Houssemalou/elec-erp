@@ -59,9 +59,10 @@ export function PaymentForm({
           <Select name="method" defaultValue="CASH">
             <option value="CASH">Espèces</option>
             <option value="CARD">Carte</option>
-            <option value="BANK_TRANSFER">Virement</option>
+            <option value="BANK_TRANSFER">Virement bancaire</option>
             <option value="CHEQUE">Chèque</option>
-            <option value="EDAHABIA">E-dinar / E-dahabia</option>
+            <option value="EDAHABIA">Edahabia</option>
+            <option value="ONLINE">En ligne</option>
           </Select>
         </div>
       </div>
@@ -72,12 +73,12 @@ export function PaymentForm({
         </div>
         <div>
           <Label>Référence</Label>
-          <Input name="reference" placeholder="N° de chèque, virement…" />
+          <Input name="reference" placeholder="N° de chèque, virement..." />
         </div>
       </div>
       <div>
         <Label>Note</Label>
-        <Input name="note" placeholder="Note interne…" />
+        <Input name="note" placeholder="Note interne..." />
       </div>
       <Button type="submit" disabled={pending}>
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
