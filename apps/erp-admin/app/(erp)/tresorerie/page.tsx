@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { PageHeader, Card, CardHeader, Table, THead, TR, TH, TD, Badge } from '@/components/ui'
-import { getFinanceSummary, getReceivablesOverview, listExpenses } from '@elec/services'
+import { getFinanceSummary, getReceivablesOverview } from '@elec/services'
 import { db } from '@elec/db'
 import { money, formatDate, dateInputValue } from '@/lib/utils'
 import {
@@ -11,7 +11,6 @@ import {
   HandCoins,
   PackageSearch,
   Receipt,
-  CalendarClock,
 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -72,17 +71,14 @@ export default async function TresoreriePage({
   const fromDate = parseDate(params.from)
   const toDate = endOfDay(params.to)
 
-  const [s, receivables, purchaseInvoices, expensesRes] = await Promise.all([
+  const [s, receivables, expensesList] = await Promise.all([
     getFinanceSummary({ from: fromDate, to: toDate }),
     getReceivablesOverview(),
-    db.purchaseInvoice.findMany({
-      where: {
-        status: 'VALIDATED',
-        ...(fromDate || toDate ? { receivedAt: { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } } : {}),
-      },
-      select: { totalTTC: true },
+    db.expense.findMany({
+      where: fromDate || toDate ? { expenseDate: { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } } : {},
+      orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
+      take: 50,
     }),
-    listExpenses({ take: 50 }),
   ])
 
   const ventesTTC = s.revenueTTC
@@ -95,8 +91,6 @@ export default async function TresoreriePage({
 
   const soldeTheorique = ventesTTC - achatsTTC - depensesTTC
   const netDisponible = encaisséTTC - achatsTTC - depensesTTC
-
-  const expensesList = expensesRes.expenses
 
   return (
     <div className="space-y-6">
@@ -134,7 +128,7 @@ export default async function TresoreriePage({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Créances clients (encours)" value={money(creancesTTC)} sub="Factures et créances libres non soldées" icon={<HandCoins className="h-5 w-5" />} tone="amber" />
         <KpiCard label="Avoirs émis TTC" value={`− ${money(avoirsTTC)}`} sub="Retours validés" icon={<Receipt className="h-5 w-5" />} tone="red" />
-        <KpiCard label="Gain / Résultat TTC" value={money(gainTTC)} sub="CA − coût de revient − dépenses" icon={<Wallet className="h-5 w-5" />} tone={gainTTC >= 0 ? 'green' : 'red'} />
+        <KpiCard label="Gain TTC" value={money(gainTTC)} sub="CA TTC − coût de revient TTC − dépenses TTC" icon={<Wallet className="h-5 w-5" />} tone={gainTTC >= 0 ? 'green' : 'red'} />
         <KpiCard label="Solde théorique (CA − achats − dépenses)" value={money(soldeTheorique)} sub="Hors encaissement effectif" icon={<Wallet className="h-5 w-5" />} tone={soldeTheorique >= 0 ? 'green' : 'red'} />
       </div>
 

@@ -112,17 +112,38 @@ export async function getFinanceSummary(options?: {
   from?: Date
   to?: Date
 }): Promise<FinanceSummary> {
+  const dateScopeInvoice = options?.from || options?.to ? {
+    OR: [
+      { validatedAt: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } },
+      { validatedAt: null, issueDate: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } },
+    ],
+  } : {}
+
+  const dateScopeDelivery = options?.from || options?.to ? {
+    OR: [
+      { validatedAt: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } },
+      { validatedAt: null, issueDate: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } },
+    ],
+  } : {}
+
+  const dateScopePurchase = options?.from || options?.to ? {
+    OR: [
+      { receivedAt: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } },
+      { receivedAt: null, issueDate: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } },
+    ],
+  } : {}
+
   const [invoices, cashSales, creditNotes, purchaseInvoices, expenseSummary, cost] = await Promise.all([
     db.invoice.findMany({
-      where: { status: { in: [...REVENUE_STATUSES] } },
+      where: { status: { in: [...REVENUE_STATUSES] }, ...dateScopeInvoice },
       include: { customer: true },
     }),
     db.deliveryNote.findMany({
-      where: CASH_SALES_WITHOUT_INVOICE,
+      where: { ...CASH_SALES_WITHOUT_INVOICE, ...dateScopeDelivery },
       select: { totalTTC: true, validatedAt: true, issueDate: true },
     }),
-    db.creditNote.findMany({ where: { status: CreditNoteStatus.VALIDATED } }),
-    db.purchaseInvoice.findMany({ where: { status: PurchaseInvoiceStatus.VALIDATED } }),
+    db.creditNote.findMany({ where: { status: CreditNoteStatus.VALIDATED, ...(options?.from || options?.to ? { issueDate: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } } : {}) } }),
+    db.purchaseInvoice.findMany({ where: { status: PurchaseInvoiceStatus.VALIDATED, ...dateScopePurchase } }),
     getExpenseSummary({ from: options?.from, to: options?.to }),
     getCostOfGoodsTTC(),
   ])
