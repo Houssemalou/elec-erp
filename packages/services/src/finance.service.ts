@@ -142,7 +142,7 @@ export async function getFinanceSummary(options?: {
       where: { ...CASH_SALES_WITHOUT_INVOICE, ...dateScopeDelivery },
       select: { totalTTC: true, validatedAt: true, issueDate: true },
     }),
-    db.creditNote.findMany({ where: { status: CreditNoteStatus.VALIDATED, ...(options?.from || options?.to ? { issueDate: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } } : {}) } }),
+    db.creditNote.findMany({ where: { status: CreditNoteStatus.VALIDATED, ...(options?.from || options?.to ? { createdAt: { ...(options?.from ? { gte: options.from } : {}), ...(options?.to ? { lte: options.to } : {}) } } : {}) } }),
     db.purchaseInvoice.findMany({ where: { status: PurchaseInvoiceStatus.VALIDATED, ...dateScopePurchase } }),
     getExpenseSummary({ from: options?.from, to: options?.to }),
     getCostOfGoodsTTC(),
