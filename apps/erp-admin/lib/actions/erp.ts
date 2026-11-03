@@ -57,6 +57,8 @@ import {
   deleteWeeklyClosing,
   weekStartOf,
   getSalesGainBetween,
+  getExpensesTotalBetween,
+  getWeeklyOpeningCash,
   type ReceivableInput,
   type WeeklyClosingInput,
 } from '@elec/services'
@@ -1405,7 +1407,6 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
 
   const revenueTTC = num(fd, 'revenueTTC')
   const purchasesTTC = num(fd, 'purchasesTTC')
-  const expensesTTC = num(fd, 'expensesTTC')
   const otherExpensesTTC = num(fd, 'otherExpensesTTC')
   const costOfGoodsTTC = num(fd, 'costOfGoodsTTC')
   const cashOnHandTTC = num(fd, 'cashOnHandTTC')
@@ -1413,7 +1414,6 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
   if (
     revenueTTC < 0 ||
     purchasesTTC < 0 ||
-    expensesTTC < 0 ||
     otherExpensesTTC < 0 ||
     costOfGoodsTTC < 0 ||
     cashOnHandTTC < 0
@@ -1427,7 +1427,6 @@ function parseWeeklyClosing(fd: FormData): { ok: true; data: WeeklyClosingInput 
       weekStart,
       revenueTTC,
       purchasesTTC,
-      expensesTTC,
       otherExpensesTTC,
       costOfGoodsTTC,
       cashOnHandTTC,
@@ -1441,6 +1440,8 @@ export interface WeeklyAutoValues {
   error?: string
   revenueTTC?: number
   costOfGoodsTTC?: number
+  expensesTTC?: number
+  openingCashTTC?: number
   missingCostLines?: number
 }
 
@@ -1453,12 +1454,19 @@ export async function getWeeklyAutoValuesAction(weekStart: string): Promise<Week
   if (Number.isNaN(date.getTime())) return { success: false, error: 'Date invalide' }
 
   const start = weekStartOf(date)
-  const result = await getSalesGainBetween(start, new Date(start.getTime() + 7 * 86400000))
+  const end = new Date(start.getTime() + 7 * 86400000)
+  const [sales, expensesTTC, openingCashTTC] = await Promise.all([
+    getSalesGainBetween(start, end),
+    getExpensesTotalBetween(start, end),
+    getWeeklyOpeningCash(start),
+  ])
   return {
     success: true,
-    revenueTTC: result.revenueTTC,
-    costOfGoodsTTC: result.costOfGoodsTTC,
-    missingCostLines: result.missingCostLines,
+    revenueTTC: sales.revenueTTC,
+    costOfGoodsTTC: sales.costOfGoodsTTC,
+    expensesTTC,
+    openingCashTTC,
+    missingCostLines: sales.missingCostLines,
   }
 }
 

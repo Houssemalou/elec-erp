@@ -333,7 +333,6 @@ export interface WeeklyClosingInput {
   weekStart: Date
   revenueTTC: number
   purchasesTTC: number
-  expensesTTC: number
   otherExpensesTTC: number
   /** Coût de revient TTC des articles vendus. Auto-rempli, ajustable. */
   costOfGoodsTTC: number
@@ -342,11 +341,25 @@ export interface WeeklyClosingInput {
   notes?: string | null
 }
 
-/** Gain TTC de la semaine. Négatif = perte. Jamais recalculé par la base. */
-export function weeklyGain(
-  input: Pick<WeeklyClosingInput, 'revenueTTC' | 'purchasesTTC' | 'expensesTTC' | 'otherExpensesTTC'>,
-): number {
-  return roundMoney(input.revenueTTC - input.purchasesTTC - input.expensesTTC - input.otherExpensesTTC)
+/**
+ * Résultat TTC de la semaine : report de caisse de la semaine précédente +
+ * chiffre d'affaires − achats − dépenses − autres dépenses. Négatif = perte.
+ * Le report est figé au moment de la clôture pour garder un historique stable.
+ */
+export function weeklyGain(input: {
+  revenueTTC: number
+  purchasesTTC: number
+  expensesTTC: number
+  otherExpensesTTC: number
+  openingCashTTC?: number
+}): number {
+  return roundMoney(
+    (input.openingCashTTC ?? 0) +
+      input.revenueTTC -
+      input.purchasesTTC -
+      input.expensesTTC -
+      input.otherExpensesTTC,
+  )
 }
 
 /**
@@ -358,10 +371,29 @@ export function weeklyMargin(input: Pick<WeeklyClosingInput, 'revenueTTC' | 'cos
   return roundMoney(input.revenueTTC - input.costOfGoodsTTC)
 }
 
+/**
+ * Reste en caisse de la semaine précédant `weekStart`, repris en report de
+ * caisse. Renvoie 0 pour la première semaine clôturée.
+ */
+export async function getWeeklyOpeningCash(weekStart: Date): Promise<number> {
+  const previousStart = new Date(weekStartOf(weekStart).getTime() - 7 * 86400000)
+  const previous = await db.weeklyClosing.findUnique({
+    where: { weekStart: previousStart },
+    select: { cashOnHandTTC: true },
+  })
+  return roundMoney(Number(previous?.cashOnHandTTC ?? 0))
+}
+
+/**
+ * Enregistre le bilan d'une semaine. Les dépenses et le report de caisse sont
+ * recalculés depuis les données réelles (module Dépenses et semaine précédente)
+ * pour que la clôture reste cohérente même si le formulaire est obsolète.
+ */
 export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: string) {
   const weekStart = weekStartOf(input.weekStart)
   const weekEnd = new Date(weekStart)
   weekEnd.setDate(weekEnd.getDate() + 7)
+  const previousStart = new Date(weekStart.getTime() - 7 * 86400000)
 
   return db.$transaction(async (tx) => {
     const existing = await tx.weeklyClosing.findUnique({ where: { weekStart } })
@@ -370,6 +402,18 @@ export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: 
     if (existing?.closedAt) {
       throw new Error('Cette semaine est clôturée : rouvrez-la avant de la modifier')
     }
+    const [expenses, previous] = await Promise.all([
+      tx.expense.aggregate({
+        where: { expenseDate: { gte: weekStart, lt: weekEnd } },
+        _sum: { amountTTC: true },
+      }),
+      tx.weeklyClosing.findUnique({
+        where: { weekStart: previousStart },
+        select: { cashOnHandTTC: true },
+      }),
+    ])
+    const expensesTTC = roundMoney(Number(expenses._sum.amountTTC ?? 0))
+    const openingCashTTC = roundMoney(Number(previous?.cashOnHandTTC ?? 0))
     const number = existing?.number ?? (await nextSequenceNumber('SEM', currentYear(), tx))
     return tx.weeklyClosing.upsert({
       where: { weekStart },
@@ -379,31 +423,61 @@ export async function saveWeeklyClosing(input: WeeklyClosingInput, createdById: 
         weekEnd,
         revenueTTC: toDecimalString(input.revenueTTC),
         purchasesTTC: toDecimalString(input.purchasesTTC),
-        expensesTTC: toDecimalString(input.expensesTTC),
+        expensesTTC: toDecimalString(expensesTTC),
         otherExpensesTTC: toDecimalString(input.otherExpensesTTC),
         costOfGoodsTTC: toDecimalString(input.costOfGoodsTTC),
         cashOnHandTTC: toDecimalString(input.cashOnHandTTC),
+        openingCashTTC: toDecimalString(openingCashTTC),
         notes: input.notes ?? null,
         createdById,
       },
       update: {
         revenueTTC: toDecimalString(input.revenueTTC),
         purchasesTTC: toDecimalString(input.purchasesTTC),
-        expensesTTC: toDecimalString(input.expensesTTC),
+        expensesTTC: toDecimalString(expensesTTC),
         otherExpensesTTC: toDecimalString(input.otherExpensesTTC),
         costOfGoodsTTC: toDecimalString(input.costOfGoodsTTC),
         cashOnHandTTC: toDecimalString(input.cashOnHandTTC),
+        openingCashTTC: toDecimalString(openingCashTTC),
         notes: input.notes ?? null,
       },
     })
   })
 }
 
-/** Verrouille la semaine : elle ne sera plus modifiable sans réouverture. */
+/**
+ * Verrouille la semaine : elle ne sera plus modifiable sans réouverture. Les
+ * dépenses et le report de caisse sont rafraîchis une dernière fois pour
+ * refléter les dépenses saisies après la création de la clôture.
+ */
 export async function closeWeeklyClosing(id: string) {
-  const closing = await db.weeklyClosing.findUnique({ where: { id } })
-  if (!closing) throw new Error('Clôture introuvable')
-  return db.weeklyClosing.update({ where: { id }, data: { closedAt: new Date() } })
+  return db.$transaction(async (tx) => {
+    const closing = await tx.weeklyClosing.findUnique({ where: { id } })
+    if (!closing) throw new Error('Clôture introuvable')
+
+    const weekStart = weekStartOf(closing.weekStart)
+    const weekEnd = new Date(weekStart.getTime() + 7 * 86400000)
+    const previousStart = new Date(weekStart.getTime() - 7 * 86400000)
+    const [expenses, previous] = await Promise.all([
+      tx.expense.aggregate({
+        where: { expenseDate: { gte: weekStart, lt: weekEnd } },
+        _sum: { amountTTC: true },
+      }),
+      tx.weeklyClosing.findUnique({
+        where: { weekStart: previousStart },
+        select: { cashOnHandTTC: true },
+      }),
+    ])
+
+    return tx.weeklyClosing.update({
+      where: { id },
+      data: {
+        expensesTTC: toDecimalString(roundMoney(Number(expenses._sum.amountTTC ?? 0))),
+        openingCashTTC: toDecimalString(roundMoney(Number(previous?.cashOnHandTTC ?? 0))),
+        closedAt: new Date(),
+      },
+    })
+  })
 }
 
 /** Réouvre une semaine clôturée pour correction. */

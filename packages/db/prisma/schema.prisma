@@ -934,8 +934,9 @@ enum ReceivableStatus {
   CANCELLED
 }
 
-/// Clôture hebdomadaire : bilan saisi à la main pour une semaine de lundi à
-/// lundi, puis verrouillé. `gainTTC` est négatif en cas de perte.
+/// Clôture hebdomadaire : bilan d'une semaine, puis verrouillé. `gainTTC` est
+/// négatif en cas de perte. Les dépenses sont reprises automatiquement du
+/// module Dépenses ; le report de caisse vient de la semaine précédente.
 model WeeklyClosing {
   id                String    @id @default(cuid())
   number            String    @unique // SEM-YYYY-NN
@@ -947,6 +948,7 @@ model WeeklyClosing {
   otherExpensesTTC  Decimal   @db.Decimal(12, 3) @default(0)
   costOfGoodsTTC    Decimal   @db.Decimal(12, 3) @default(0) // Coût de revient TTC des articles vendus
   cashOnHandTTC     Decimal   @db.Decimal(12, 3) @default(0) // Espèces en caisse à la clôture
+  openingCashTTC    Decimal   @db.Decimal(12, 3) @default(0) // Report de caisse : reste en caisse de la semaine précédente
   notes             String?
   closedAt          DateTime? // Renseigné au verrouillage, vide tant que la semaine est ouverte
   createdById       String

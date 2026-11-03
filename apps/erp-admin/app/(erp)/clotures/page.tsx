@@ -9,7 +9,16 @@ import {
   saveWeeklyClosingAction,
   getWeeklyAutoValuesAction,
 } from '@/lib/actions/erp'
-import { getWeeklyClosingByWeek, listWeeklyClosings, weeklyGain, weeklyMargin, weekStartOf, getSalesGainBetween } from '@elec/services'
+import {
+  getWeeklyClosingByWeek,
+  listWeeklyClosings,
+  weeklyGain,
+  weeklyMargin,
+  weekStartOf,
+  getSalesGainBetween,
+  getExpensesTotalBetween,
+  getWeeklyOpeningCash,
+} from '@elec/services'
 import { money, formatDate, dateInputValue, parseDateInput } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -28,8 +37,14 @@ export default async function CloturesPage({
   const [current, history] = await Promise.all([getWeeklyClosingByWeek(reference), listWeeklyClosings()])
   const weekStart = current?.weekStart ?? weekStartOf(reference)
   const weekEnd = new Date(weekStart.getTime() + 6 * 86400000)
-  // Le gain TTC est calculé automatiquement sur la semaine (lundi → lundi exclu).
-  const autoGain = await getSalesGainBetween(weekStart, new Date(weekStart.getTime() + 7 * 86400000))
+  // Les valeurs automatiques couvrent la semaine entière (fin exclue), comme
+  // les ventes : dépenses du module Dépenses et report de caisse précédent.
+  const autoEnd = new Date(weekStart.getTime() + 7 * 86400000)
+  const [autoGain, autoExpensesTTC, autoOpeningCashTTC] = await Promise.all([
+    getSalesGainBetween(weekStart, autoEnd),
+    getExpensesTotalBetween(weekStart, autoEnd),
+    getWeeklyOpeningCash(weekStart),
+  ])
 
   const gain = current
     ? weeklyGain({
@@ -37,6 +52,7 @@ export default async function CloturesPage({
         purchasesTTC: Number(current.purchasesTTC),
         expensesTTC: Number(current.expensesTTC),
         otherExpensesTTC: Number(current.otherExpensesTTC),
+        openingCashTTC: Number(current.openingCashTTC),
       })
     : null
   const margin = current
@@ -50,7 +66,7 @@ export default async function CloturesPage({
     <div className="space-y-6">
       <PageHeader
         title="Clôtures hebdomadaires"
-        description="Saisissez le bilan de chaque semaine (lundi → lundi), puis clôturez-la pour fixer le résultat."
+        description="Saisissez le bilan de chaque semaine, puis clôturez-la. Les dépenses et le report de caisse sont calculés automatiquement."
       />
 
       <Card>
@@ -94,7 +110,7 @@ export default async function CloturesPage({
           <Card>
             <CardHeader
               title={`Semaine du ${formatDate(weekStart)} au ${formatDate(weekEnd)}`}
-              subtitle="Les montants sont saisis à la main, en TTC"
+              subtitle="Montants en TTC — dépenses et report de caisse calculés automatiquement"
               action={
                 <Link
                   href={`/clotures?semaine=${dateInputValue(latestMonday)}`}
@@ -118,6 +134,7 @@ export default async function CloturesPage({
                       ['Achats TTC', Number(current.purchasesTTC)],
                       ['Dépenses TTC', Number(current.expensesTTC)],
                       ['Autres dépenses TTC', Number(current.otherExpensesTTC)],
+                      ['Report de caisse TTC', Number(current.openingCashTTC)],
                       ['Espèces en caisse TTC', Number(current.cashOnHandTTC)],
                     ].map(([label, value]) => (
                       <div key={String(label)} className="flex justify-between border-b border-[#2A2A2A] pb-2">
@@ -132,7 +149,7 @@ export default async function CloturesPage({
                       </dd>
                     </div>
                     <div className="flex justify-between border-b border-[#2A2A2A] pb-2 sm:col-span-2">
-                      <dt className="text-white/50">Résultat net</dt>
+                      <dt className="text-white/50">Résultat net (report + CA − achats − dépenses − autres)</dt>
                       <dd className={`font-bold ${(gain ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {(gain ?? 0) >= 0 ? 'Gain' : 'Perte'} : {money(Math.abs(gain ?? 0))}
                       </dd>
@@ -156,7 +173,6 @@ export default async function CloturesPage({
                           weekStart: current.weekStart,
                           revenueTTC: String(current.revenueTTC),
                           purchasesTTC: String(current.purchasesTTC),
-                          expensesTTC: String(current.expensesTTC),
                           otherExpensesTTC: String(current.otherExpensesTTC),
                           costOfGoodsTTC: String(current.costOfGoodsTTC),
                           cashOnHandTTC: String(current.cashOnHandTTC),
@@ -164,7 +180,13 @@ export default async function CloturesPage({
                         }
                       : null
                   }
-                  auto={autoGain}
+                  auto={{
+                    revenueTTC: autoGain.revenueTTC,
+                    costOfGoodsTTC: autoGain.costOfGoodsTTC,
+                    expensesTTC: autoExpensesTTC,
+                    openingCashTTC: autoOpeningCashTTC,
+                    missingCostLines: autoGain.missingCostLines,
+                  }}
                   autoValuesAction={getWeeklyAutoValuesAction}
                   action={saveWeeklyClosingAction}
                   closeAction={closeWeeklyClosingAction}
@@ -189,6 +211,7 @@ export default async function CloturesPage({
                     purchasesTTC: Number(w.purchasesTTC),
                     expensesTTC: Number(w.expensesTTC),
                     otherExpensesTTC: Number(w.otherExpensesTTC),
+                    openingCashTTC: Number(w.openingCashTTC),
                   })
                   const wMargin = weeklyMargin({
                     revenueTTC: Number(w.revenueTTC),

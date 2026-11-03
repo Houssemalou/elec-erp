@@ -12,7 +12,6 @@ export interface WeeklyClosingFormData {
   weekStart: Date
   revenueTTC: string
   purchasesTTC: string
-  expensesTTC: string
   otherExpensesTTC: string
   costOfGoodsTTC: string
   cashOnHandTTC: string
@@ -23,10 +22,12 @@ export interface WeeklyClosingFormData {
  * Saisie du bilan hebdomadaire, puis verrouillage.
  *
  * Le chiffre d'affaires et le coût de revient sont pré-remplis automatiquement
- * à partir des ventes de la semaine, mais restent modifiables. La marge brute
- * (CA − coût de revient) et le résultat net (CA − achats − dépenses − autres)
- * sont recalculés ici, la base ne les recalcule pas. La clôture est une action
- * séparée pour ne pas verrouiller une semaine par mégarde.
+ * à partir des ventes de la semaine, les dépenses à partir du module Dépenses.
+ * Le report de caisse reprend le reste en caisse de la semaine précédente.
+ * La marge brute (CA − coût de revient) et le résultat net (report + CA −
+ * achats − dépenses − autres) sont recalculés ici, la base ne les recalcule pas.
+ * La clôture est une action séparée pour ne pas verrouiller une semaine par
+ * mégarde.
  */
 export function WeeklyClosingForm({
   closing,
@@ -40,14 +41,22 @@ export function WeeklyClosingForm({
   closing: WeeklyClosingFormData | null
   /** Lundi proposé quand aucune clôture n'existe encore (ex. semaine en retard). */
   defaultWeekStart: Date
-  /** Valeurs calculées automatiquement à partir des ventes de la semaine. */
-  auto: { revenueTTC: number; costOfGoodsTTC: number; missingCostLines: number }
+  /** Valeurs calculées automatiquement à partir des ventes et dépenses de la semaine. */
+  auto: {
+    revenueTTC: number
+    costOfGoodsTTC: number
+    expensesTTC: number
+    openingCashTTC: number
+    missingCostLines: number
+  }
   /** Recalcule les valeurs automatiques pour le lundi choisi. */
   autoValuesAction: (weekStart: string) => Promise<{
     success: boolean
     error?: string
     revenueTTC?: number
     costOfGoodsTTC?: number
+    expensesTTC?: number
+    openingCashTTC?: number
     missingCostLines?: number
   }>
   action: (fd: FormData) => Promise<{ success: boolean; error?: string }>
@@ -60,14 +69,17 @@ export function WeeklyClosingForm({
 
   const [autoRevenue, setAutoRevenue] = useState(String(auto.revenueTTC))
   const [autoCost, setAutoCost] = useState(String(auto.costOfGoodsTTC))
+  const [autoExpenses, setAutoExpenses] = useState(String(auto.expensesTTC))
+  const [autoOpeningCash, setAutoOpeningCash] = useState(String(auto.openingCashTTC))
   const [missing, setMissing] = useState(auto.missingCostLines)
 
   const [weekStart, setWeekStart] = useState(dateInputValue(closing?.weekStart ?? defaultWeekStart))
   const [revenue, setRevenue] = useState(closing?.revenueTTC ?? String(auto.revenueTTC))
   const [purchases, setPurchases] = useState(closing?.purchasesTTC ?? '')
-  const [expenses, setExpenses] = useState(closing?.expensesTTC ?? '')
+  const [expenses, setExpenses] = useState(String(auto.expensesTTC))
   const [other, setOther] = useState(closing?.otherExpensesTTC ?? '')
   const [costOfGoods, setCostOfGoods] = useState(closing?.costOfGoodsTTC ?? String(auto.costOfGoodsTTC))
+  const [openingCash, setOpeningCash] = useState(String(auto.openingCashTTC))
   const [cashOnHand, setCashOnHand] = useState(closing?.cashOnHandTTC ?? '')
 
   const num = (v: string) => {
@@ -75,8 +87,11 @@ export function WeeklyClosingForm({
     return Number.isFinite(n) ? n : 0
   }
   const gain = useMemo(
-    () => Math.round((num(revenue) - num(purchases) - num(expenses) - num(other)) * 1000) / 1000,
-    [revenue, purchases, expenses, other],
+    () =>
+      Math.round(
+        (num(openingCash) + num(revenue) - num(purchases) - num(expenses) - num(other)) * 1000,
+      ) / 1000,
+    [openingCash, revenue, purchases, expenses, other],
   )
   const margin = useMemo(
     () => Math.round((num(revenue) - num(costOfGoods)) * 1000) / 1000,
@@ -85,6 +100,8 @@ export function WeeklyClosingForm({
   const resetToAuto = () => {
     setRevenue(autoRevenue)
     setCostOfGoods(autoCost)
+    setExpenses(autoExpenses)
+    setOpeningCash(autoOpeningCash)
   }
   // Changer de semaine recalcule les valeurs automatiques (création seulement).
   const onWeekStartChange = (value: string) => {
@@ -95,11 +112,17 @@ export function WeeklyClosingForm({
       if (!res.success) return
       const rev = String(res.revenueTTC ?? 0)
       const cost = String(res.costOfGoodsTTC ?? 0)
+      const exp = String(res.expensesTTC ?? 0)
+      const opening = String(res.openingCashTTC ?? 0)
       setAutoRevenue(rev)
       setAutoCost(cost)
+      setAutoExpenses(exp)
+      setAutoOpeningCash(opening)
       setMissing(res.missingCostLines ?? 0)
       setRevenue(rev)
       setCostOfGoods(cost)
+      setExpenses(exp)
+      setOpeningCash(opening)
     })
   }
 
@@ -227,10 +250,15 @@ export function WeeklyClosingForm({
               step="0.001"
               min="0"
               required
+              readOnly
               value={expenses}
-              onChange={(e) => setExpenses(e.target.value)}
+              className="cursor-not-allowed opacity-70"
               placeholder="0,000"
             />
+            <p className="mt-1 text-xs text-white/40">
+              Calculé automatiquement : somme des dépenses datées dans la semaine (section Dépenses).
+              Utilisez « Autres dépenses » pour un montant non enregistré.
+            </p>
           </div>
         </div>
 
@@ -251,12 +279,28 @@ export function WeeklyClosingForm({
           <div className="flex items-end">
             <Button type="button" variant="outline" onClick={resetToAuto}>
               <RefreshCw className="h-4 w-4" />
-              Recalculer CA et prix de revient
+              Recalculer CA, dépenses et report
             </Button>
           </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="openingCashTTC">Report de caisse (semaine précédente, TTC)</Label>
+            <Input
+              id="openingCashTTC"
+              type="number"
+              step="0.001"
+              min="0"
+              readOnly
+              value={openingCash}
+              className="cursor-not-allowed opacity-70"
+              placeholder="0,000"
+            />
+            <p className="mt-1 text-xs text-white/40">
+              Reste en caisse de la semaine précédente, ajouté au résultat de cette semaine.
+            </p>
+          </div>
           <div>
             <Label htmlFor="cashOnHandTTC">Montant en caisse à la fin de la semaine (TTC)</Label>
             <Input
@@ -295,7 +339,9 @@ export function WeeklyClosingForm({
             </span>
           </div>
           <div className="flex items-center justify-between rounded-lg border border-[#2A2A2A] bg-[#151515] px-4 py-3">
-            <span className="text-sm text-white/60">Résultat net (CA − achats − dépenses − autres)</span>
+            <span className="text-sm text-white/60">
+              Résultat net (report + CA − achats − dépenses − autres)
+            </span>
             <span className={`font-display text-lg font-bold ${gain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               {gain >= 0 ? 'Gain' : 'Perte'} : {money(Math.abs(gain))}
             </span>

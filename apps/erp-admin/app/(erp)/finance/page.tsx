@@ -226,7 +226,7 @@ export default async function FinancePage() {
         <Card>
           <CardHeader
             title="Clôtures hebdomadaires"
-            subtitle="Bilan saisi manuellement, gain ou perte"
+            subtitle="Bilan hebdomadaire, report de caisse inclus"
             action={
               <Link href="/clotures" className="text-xs text-accent-400 hover:text-accent-300">
                 Ouvrir
@@ -249,6 +249,7 @@ export default async function FinancePage() {
                     purchasesTTC: Number(w.purchasesTTC),
                     expensesTTC: Number(w.expensesTTC),
                     otherExpensesTTC: Number(w.otherExpensesTTC),
+                    openingCashTTC: Number(w.openingCashTTC),
                   })
                   return (
                     <li key={w.id}>
